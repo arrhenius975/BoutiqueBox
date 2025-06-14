@@ -28,33 +28,34 @@ import { useToast } from '@/hooks/use-toast';
 // The `label` is what users see in the dropdown.
 // The `section` helps group categories visually in the dropdown (must be part of AppSection type).
 //
-// Example structure after fetching from your DB (SELECT id, name FROM categories;):
-// If DB has: { id: 1, name: 'Fresh Meats' }, { id: 2, name: 'Organic Vegetables' }
+// Example: If your DB `categories` table has:
+// { id: 1, name: 'Fresh Meats' }, { id: 2, name: 'Organic Vegetables' }
 // Your array here should be:
 // { id: 1, value: 'meats', label: 'Fresh Meats', section: 'grocery' },
 // { id: 2, value: 'vegetables', label: 'Organic Vegetables', section: 'grocery' },
-// ... and so on for all your categories.
+// ... and so on for all your categories. Ensure each `value` and `section` is added to `src/types/index.ts`.
 // -----------------
 const allPossibleCategories: { id: number; value: ProductCategory; label: string; section: AppSection }[] = [
-  // Grocery (Existing examples - VERIFY/UPDATE IDs and labels)
+  // Grocery
   { id: 1, value: 'meats', label: 'Meats', section: 'grocery' },
   { id: 2, value: 'vegetables', label: 'Vegetables', section: 'grocery' },
   { id: 3, value: 'fruits', label: 'Fruits', section: 'grocery' },
   { id: 4, value: 'breads', label: 'Breads', section: 'grocery' },
-  // Cosmetics (Existing examples - VERIFY/UPDATE IDs and labels)
+  // Cosmetics
   { id: 5, value: 'skincare', label: 'Skincare', section: 'cosmetics' },
   { id: 6, value: 'makeup', label: 'Makeup', section: 'cosmetics' },
   { id: 7, value: 'fragrance', label: 'Fragrance', section: 'cosmetics' },
-  // Fast Food (Existing examples - VERIFY/UPDATE IDs and labels)
+  // Fast Food
   { id: 8, value: 'burgers', label: 'Burgers', section: 'fastfood' },
   { id: 9, value: 'pizza', label: 'Pizza', section: 'fastfood' },
   { id: 10, value: 'sides', label: 'Sides', section: 'fastfood' },
   { id: 11, value: 'drinks', label: 'Drinks', section: 'fastfood' },
-  // New example categories (REPLACE THESE WITH YOUR ACTUAL DB DATA AND IDs)
+  // New example categories (REPLACE THESE WITH YOUR ACTUAL DB DATA, IDs, and ensure types are updated)
   { id: 100, value: 'electronics', label: 'Electronics', section: 'tech' },
   { id: 101, value: 'clothing', label: 'Clothing', section: 'fashion' },
   { id: 102, value: 'books', label: 'Books', section: 'literature' },
-  { id: 103, value: 'all', label: 'Uncategorized', section: 'other' }, // Fallback if needed
+  // Fallback or uncategorized - ensure it's handled correctly if products can be uncategorized
+  // { id: 999, value: 'all', label: 'Uncategorized', section: 'other' },
 ];
 
 
@@ -79,7 +80,7 @@ export default function AdminProductsPage() {
       const data = await response.json();
       
       const formattedProducts: Product[] = data.map((p: any) => {
-        const dbCategoryId = p.category_id?.id;
+        const dbCategoryId = p.category_id?.id; // category_id is an object { id: number, name: string }
         const matchedCategory = allPossibleCategories.find(cat => cat.id === dbCategoryId);
         const frontendCategory = matchedCategory?.value || 'all'; // Default to 'all' or handle as uncategorized
 
@@ -88,7 +89,7 @@ export default function AdminProductsPage() {
           name: p.name,
           description: p.description,
           price: parseFloat(p.price), 
-          category: frontendCategory as ProductCategory,
+          category: frontendCategory as ProductCategory, // Ensure type safety
           image: p.product_images?.find((img: any) => img.is_primary)?.image_url || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
           'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
         };
@@ -97,7 +98,7 @@ export default function AdminProductsPage() {
     } catch (error) {
       console.error("Fetch products error:", error);
       toast({ title: "Error Fetching Products", description: (error as Error).message, variant: "destructive" });
-      setProducts([]);
+      setProducts([]); // Clear products on error
     } finally {
       setIsLoadingProducts(false);
     }
@@ -115,7 +116,7 @@ export default function AdminProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    toast({ title: "Edit Mode", description: "Editing opens the form pre-filled. API for update (PUT) is separate."});
+    toast({ title: "Edit Mode (UI Only)", description: "Editing a product opens the form pre-filled. Backend PUT API for update is not yet implemented by the client."});
     setIsFormOpen(true);
   };
 
@@ -129,12 +130,12 @@ export default function AdminProductsPage() {
         method: 'DELETE',
       });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to delete product and parse error' }));
+        const errorData = await response.json().catch(() => ({ error: 'Failed to delete product and parse error response.' }));
         throw new Error(errorData.error || 'Failed to delete product');
       }
       
-      setProducts(products.filter(p => p.id !== productId)); // Optimistic update
-      // fetchProducts(); // Or re-fetch for consistency
+      // setProducts(products.filter(p => p.id !== productId)); // Optimistic update
+      fetchProducts(); // Re-fetch for consistency after successful deletion
       toast({ title: "Product Deleted", description: `Product ${productId} has been removed.` });
     } catch (error) {
       console.error("Delete product error:", error);
@@ -159,7 +160,7 @@ export default function AdminProductsPage() {
     if (categoryDetails) {
       formData.append('category_id', categoryDetails.id.toString());
     } else {
-      toast({ title: "Category Error", description: `Selected category "${data.category}" is not configured correctly. Please check admin settings.`, variant: "destructive" });
+      toast({ title: "Category Error", description: `Selected category "${data.category}" is not configured correctly. Please check admin settings and ensure allPossibleCategories array matches DB.`, variant: "destructive" });
       setIsSubmitting(false);
       if(loadingToastId) toast.dismiss(loadingToastId);
       return;
@@ -170,14 +171,15 @@ export default function AdminProductsPage() {
       formData.append('imageFile', data.imageFile, data.imageFile.name);
     }
     
-    formData.append('dataAiHint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product');
+    formData.append('data_ai_hint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product'); // Corrected key
 
     try {
       let response;
       if (data.id) {
-        // UPDATE (PUT) LOGIC - Not yet implemented fully.
+        // UPDATE (PUT) LOGIC - Not yet implemented on client or backend.
         // You would typically make a PUT request to /api/products/${data.id}
-        toast({ title: "Update Not Implemented", description: "Product update API endpoint is not specified yet. This is a UI mock.", variant: "default" });
+        // For now, this just updates UI optimistically.
+        toast({ title: "Update Not Implemented (UI Mock)", description: "Product update API endpoint is not yet connected to this form. Displaying mock update.", variant: "default" });
         const productData: Product = {
             id: data.id,
             name: data.name,
@@ -188,22 +190,27 @@ export default function AdminProductsPage() {
            'data-ai-hint': data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product',
         };
         setProducts(products.map(p => (p.id === data.id ? productData : p)));
+        setIsFormOpen(false); 
+        setEditingProduct(null);
       } else {
         // CREATE (POST) LOGIC
         response = await fetch('/api/products', {
           method: 'POST',
           body: formData,
+          // Headers are not explicitly set for FormData; browser handles multipart/form-data
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Server error during product creation.' }));
+          const errorData = await response.json().catch(() => ({ error: 'Server error during product creation. Unable to parse error response.' }));
           throw new Error(errorData.error || 'Failed to add product');
         }
         
         const result = await response.json();
         if (result.success && result.product) {
           toast({ title: "Product Added", description: `${result.product.name} has been successfully added.` });
-          fetchProducts(); 
+          fetchProducts(); // Re-fetch to get the latest list including the new product with its server-assigned ID and image URL
+          setIsFormOpen(false); 
+          setEditingProduct(null);
         } else {
           throw new Error(result.error || "Unknown error from API after adding product.");
         }
@@ -215,8 +222,8 @@ export default function AdminProductsPage() {
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsSubmitting(false);
-      setIsFormOpen(false); 
-      setEditingProduct(null);
+      // Do not close form or reset editingProduct on error, allow user to correct.
+      // Only close/reset on success.
     }
   };
 
@@ -228,12 +235,11 @@ export default function AdminProductsPage() {
     return matchesSearch && matchesCategory;
   });
   
-  // Filter out 'all' from category options for the form's dropdown
   const formSelectableCategories = allPossibleCategories
-    .filter(cat => cat.value !== 'all') // Ensure 'all' is not a selectable category in the form
+    .filter(cat => cat.value !== 'all') 
     .map(c => ({
       value: c.value, 
-      label: `${c.label} (${c.section})` // Example: "Meats (grocery)"
+      label: `${c.label} (${c.section})`
     }));
 
 
@@ -245,7 +251,8 @@ export default function AdminProductsPage() {
           <p className="text-muted-foreground">Add, edit, or remove products from your store.</p>
         </div>
         <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting || isLoadingProducts}>
-          <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
+          {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
+          Add New Product
         </Button>
       </header>
 
@@ -264,15 +271,15 @@ export default function AdminProductsPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
+                disabled={isLoadingProducts}
               />
             </div>
-            <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value as ProductCategory | 'all')}>
+            <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value as ProductCategory | 'all')} disabled={isLoadingProducts}>
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {/* Use formSelectableCategories which are filtered and formatted for display */}
                 {formSelectableCategories.map(cat => (
                   <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
                 ))}
@@ -321,7 +328,7 @@ export default function AdminProductsPage() {
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       <Button variant="destructive" size="icon" onClick={() => handleDeleteProduct(product.id)} title="Delete" disabled={isSubmitting}>
-                        <Trash2 className="h-4 w-4" />
+                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
                     </div>
                   </TableCell>
@@ -350,7 +357,7 @@ export default function AdminProductsPage() {
               product={editingProduct}
               onSubmit={handleFormSubmit}
               onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }}
-              availableCategories={formSelectableCategories} // Use the filtered list for the form
+              availableCategories={formSelectableCategories}
               isSubmitting={isSubmitting}
             />
           )}
@@ -362,5 +369,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
     

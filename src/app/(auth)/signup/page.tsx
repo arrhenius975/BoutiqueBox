@@ -16,7 +16,7 @@ export default function SignUpPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signUpWithEmail, isLoadingAuth, authUser } = useAppContext();
+  const { signUpWithEmail, isLoadingAuth, authUser, userProfile } = useAppContext(); // Added userProfile
   const router = useRouter();
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -25,17 +25,24 @@ export default function SignUpPage() {
     // After sign-up, Supabase typically requires email verification.
     // The user will be in an "unverified" state until they click the link in their email.
     // Redirecting to sign-in or a "please verify" page is common.
-    // For now, we'll assume they might be redirected to sign-in page or can sign in after verification.
+    // For now, AppContext's onAuthStateChange will handle future redirects once verified and profile loaded.
   };
 
   // Redirect if user is already logged in
   useEffect(() => {
     if (!isLoadingAuth && authUser) {
-      router.push('/account');
+      // Wait for userProfile to be potentially loaded by onAuthStateChange
+      if (userProfile) {
+        if (userProfile.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else {
+          router.push('/account'); // Default redirect for non-admin logged-in users
+        }
+      } // else: authUser exists, profile not yet loaded, wait for next effect run.
     }
-  }, [authUser, isLoadingAuth, router]);
+  }, [authUser, userProfile, isLoadingAuth, router]);
 
-  if (isLoadingAuth && !authUser) { // Show loading only if not already determined to be logged in
+  if (isLoadingAuth && !authUser) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -43,7 +50,8 @@ export default function SignUpPage() {
     );
   }
   
-  if (authUser) {
+  // If already logged in and trying to access sign-up, show loader while redirecting
+  if (authUser && !isLoadingAuth) { // Check !isLoadingAuth to ensure auth state is settled
      return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -115,5 +123,4 @@ export default function SignUpPage() {
     </Card>
   );
 }
-
     

@@ -2,7 +2,7 @@
 // src/app/(auth)/signin/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,21 +22,30 @@ export default function SignInPage() {
     e.preventDefault();
     await signInWithEmail(email, password);
     // AppContext's onAuthStateChange will handle profile fetching and redirects if necessary
+    // However, explicit redirect here after successful sign-in attempt might be needed
+    // if onAuthStateChange doesn't update userProfile fast enough for the useEffect below.
   };
 
-  // Redirect if user is already logged in
   useEffect(() => {
     if (!isLoadingAuth && authUser) {
-      if (userProfile?.role === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/account');
+      // Wait for userProfile to be potentially loaded by onAuthStateChange
+      if (userProfile) {
+        if (userProfile.role === 'admin') {
+          router.push('/admin/dashboard');
+        } else {
+          router.push('/account');
+        }
+      } else if (authUser && !userProfile) {
+        // AuthUser exists, but profile hasn't loaded yet.
+        // This state can occur briefly. We can show a loader or wait.
+        // For now, if profile is null but authUser exists, we assume it's loading.
+        // A more robust solution might involve a specific `isProfileLoading` state.
       }
     }
   }, [authUser, userProfile, isLoadingAuth, router]);
 
 
-  if (isLoadingAuth && !authUser) { // Show loading only if not already determined to be logged in
+  if (isLoadingAuth && !authUser) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -44,8 +53,8 @@ export default function SignInPage() {
     );
   }
   
-  // If already logged in and useEffect hasn't redirected yet, show loader or nothing
-  if (authUser) {
+  // If already logged in and trying to access sign-in, show loader while redirecting
+  if (authUser && !isLoadingAuth) { // Check !isLoadingAuth to ensure auth state is settled
      return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -105,5 +114,4 @@ export default function SignInPage() {
     </Card>
   );
 }
-
     

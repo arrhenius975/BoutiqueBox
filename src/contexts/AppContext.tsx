@@ -75,14 +75,13 @@ interface AppContextType {
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
 
-  // Auth related
   authUser: AuthUser | null;
   userProfile: SupabaseUser | null;
   isLoadingAuth: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  setUserProfile: React.Dispatch<React.SetStateAction<SupabaseUser | null>>; // To allow local updates like avatar preview
+  setUserProfile: React.Dispatch<React.SetStateAction<SupabaseUser | null>>;
 
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
@@ -124,16 +123,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system');
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [userProfile, setUserProfileState] = useState<SupabaseUser | null>(null); // Renamed to avoid conflict
+  const [userProfile, setUserProfileState] = useState<SupabaseUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  // Wrapper for setUserProfile to make it available in context
+  const { toast } = useToast();
+
   const setUserProfile = useCallback((profile: SupabaseUser | null | ((prevState: SupabaseUser | null) => SupabaseUser | null)) => {
     setUserProfileState(profile);
   }, []);
-
-
-  const { toast } = useToast();
 
   const setTheme = useCallback((newTheme: 'light' | 'dark' | 'system') => {
     setThemeState(newTheme);
@@ -175,6 +172,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       mediaQuery.addEventListener('change', applyCurrentTheme);
       return () => mediaQuery.removeEventListener('change', applyCurrentTheme);
     } else {
+      // Cleanup listener if theme is not system
       mediaQuery.removeEventListener('change', applyCurrentTheme);
     }
   }, [theme]);
@@ -217,72 +215,75 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setViewedProducts([]);
         setRecommendations([]);
         setSelectedCategory('all');
-        if (pathname === '/' && searchTerm) { 
-            setSearchTerm('');
-            setSearchFilterType('all');
+        // Reset search term only if navigating to a non-feature page like landing ('/') or account/settings
+        if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin')) {
+           if (searchTerm) setSearchTerm('');
+           if (searchFilterType !== 'all') setSearchFilterType('all');
         }
       }
     }
-  }, [pathname, currentSection, searchTerm]);
+  }, [pathname, currentSection, searchTerm, searchFilterType]); // Added searchFilterType
 
   // Auth state change listener
   useEffect(() => {
-    setIsLoadingAuth(true);
-    const getInitialSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            setAuthUser(session.user);
-            const { data: profileData, error } = await supabase
-                .from('users')
-                .select('*') // Selects all columns including name, role, avatar_url if they exist
-                .eq('auth_id', session.user.id)
-                .single();
-            if (error) {
-                console.error('Error fetching user profile on initial load:', error);
-            } else {
-                setUserProfile(profileData as SupabaseUser);
-            }
-        }
-        setIsLoadingAuth(false);
+    const fetchUserProfile = async (userId: string) => {
+      const { data: profileData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', userId)
+        .single();
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        toast({ title: "Profile Error", description: "Could not load your profile details.", variant: "destructive" });
+        setUserProfile(null);
+      } else {
+        setUserProfile(profileData as SupabaseUser);
+      }
     };
-    getInitialSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setIsLoadingAuth(true);
       setAuthUser(session?.user ?? null);
       if (session?.user) {
-        const { data: profileData, error } = await supabase
-          .from('users')
-          .select('*') // Selects all columns
-          .eq('auth_id', session.user.id)
-          .single();
-        if (error) {
-          toast({ title: "Error fetching profile", description: error.message, variant: "destructive" });
-          setUserProfile(null);
-        } else {
-          setUserProfile(profileData as SupabaseUser);
-        }
+        await fetchUserProfile(session.user.id);
       } else {
         setUserProfile(null);
       }
       setIsLoadingAuth(false);
     });
+    
+    // Initial session check
+    const getInitialSession = async () => {
+        setIsLoadingAuth(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        setAuthUser(session?.user ?? null);
+        if (session?.user) {
+            await fetchUserProfile(session.user.id);
+        } else {
+            setUserProfile(null);
+        }
+        setIsLoadingAuth(false);
+    };
+    getInitialSession();
+
 
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [toast, setUserProfile]); // Added setUserProfile to dependency array
+  }, [toast, setUserProfile]);
 
   const signInWithEmail = async (email: string, password: string) => {
     setIsLoadingAuth(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setIsLoadingAuth(false); // Set loading to false regardless of outcome
     if (error) {
       toast({ title: "Sign In Failed", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Signed In Successfully!"});
       // Profile will be fetched by onAuthStateChange
+      // Wait for profile to be potentially set by onAuthStateChange before redirecting
+      // This might need a small delay or a check if profile is loaded for role-based redirect
     }
-    setIsLoadingAuth(false); // Moved inside, ensures it's set regardless of error
   };
 
   const signUpWithEmail = async (name: string, email: string, password: string) => {
@@ -294,30 +295,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             data: { name: name } 
         }
     });
-
+    setIsLoadingAuth(false);
     if (error) {
       toast({ title: "Sign Up Failed", description: error.message, variant: "destructive" });
     } else if (data.user) {
-      // Trigger 'handle_new_user' should create a row in public.users.
-      // If your trigger also copies 'name' from raw_user_meta_data, it will be set.
-      // Otherwise, 'name' in public.users might be null initially.
       toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
+      // Profile creation is handled by Supabase trigger 'handle_new_user'.
+      // onAuthStateChange will fetch it.
     }
-    setIsLoadingAuth(false); // Moved inside
   };
   
   const signOut = async () => {
     setIsLoadingAuth(true);
     const { error } = await supabase.auth.signOut();
+    setIsLoadingAuth(false);
     if (error) {
       toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
     } else {
       setAuthUser(null);
-      setUserProfile(null); // Clear local profile state
+      setUserProfile(null);
+      setCart([]);
+      setWishlist([]);
+      setViewedProducts([]);
       toast({ title: "Signed Out"});
       router.push('/'); 
     }
-    setIsLoadingAuth(false); // Moved inside
   };
 
 
@@ -333,7 +335,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
     toast({
       title: "Added to Cart",
-      description: `${product.name} has been added to your cart.`,
+      description: `${product.name} has been added.`,
     });
   }, [toast]);
 
@@ -341,8 +343,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Cart",
-      description: `Item has been removed from your cart.`,
-      variant: "destructive"
+      variant: "default" // Not destructive, just informational
     });
   }, [toast]);
 
@@ -350,7 +351,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.id === productId ? { ...item, quantity } : item
-      ).filter(item => item.quantity > 0)
+      ).filter(item => item.quantity > 0) // Remove if quantity becomes 0 or less
     );
   }, []);
 
@@ -358,19 +359,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart([]);
     toast({
       title: "Cart Cleared",
-      description: "All items have been removed from your cart.",
     });
   }, [toast]);
 
   const addToWishlist = useCallback((product: Product) => {
     setWishlist((prevWishlist) => {
       if (prevWishlist.find((item) => item.id === product.id)) {
-        // Do not add if already exists, but also don't show a toast here as it's handled in ProductCard/Page
-        return prevWishlist;
+        // If already wishlisted, remove it (toggle behavior)
+        toast({
+          title: "Removed from Wishlist",
+          description: `${product.name} is no longer in your wishlist.`,
+        });
+        return prevWishlist.filter(item => item.id !== product.id);
       }
       toast({
         title: "Added to Wishlist",
-        description: `${product.name} has been added to your wishlist.`,
+        description: `${product.name} has been added.`,
       });
       return [...prevWishlist, product];
     });
@@ -380,8 +384,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setWishlist((prevWishlist) => prevWishlist.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Wishlist",
-      description: `Item has been removed from your wishlist.`,
-      variant: "destructive"
     });
   }, [toast]);
 
@@ -389,7 +391,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setViewedProducts((prev) => {
       if (prev.includes(productId)) return prev;
       const newViewed = [...prev, productId];
-      return newViewed.slice(-10); // Keep last 10 viewed
+      return newViewed.slice(-10); 
     });
   }, []);
 
@@ -401,9 +403,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const fetchRecommendations = useCallback(async () => {
     if (!currentSectionConfig || viewedProducts.length === 0) {
       toast({
-        title: "Not enough data",
-        description: "View some products in this section to get personalized recommendations.",
-        variant: "destructive",
+        title: "Need More Info",
+        description: "Explore some products in this section first to get personalized recommendations.",
       });
       return;
     }
@@ -421,15 +422,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         openRecommendationsModal();
       } else {
         toast({
-          title: "No specific recommendations",
-          description: "We couldn't find specific recommendations for you at this time. Explore more products!",
+          title: "No Specific Recommendations Yet",
+          description: "Keep exploring! We'll find something for you soon.",
         });
       }
     } catch (error) {
       console.error("Failed to fetch recommendations:", error);
       toast({
-        title: "Error",
-        description: "Could not fetch recommendations.",
+        title: "Recommendation Error",
+        description: "Could not fetch recommendations at this time.",
         variant: "destructive",
       });
       setRecommendations([]);
@@ -460,12 +461,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         theme,
         setTheme,
         authUser,
-        userProfile: userProfile, // Use the state variable userProfile
+        userProfile,
         isLoadingAuth,
         signInWithEmail,
         signUpWithEmail,
         signOut,
-        setUserProfile, // Expose the setter
+        setUserProfile,
         addToCart,
         removeFromCart,
         updateCartQuantity,

@@ -13,7 +13,6 @@ import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, H
 import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
-// Removed direct supabase import, API call will handle it
 import { useToast } from '@/hooks/use-toast';
 
 export default function AccountPage() {
@@ -33,7 +32,7 @@ export default function AccountPage() {
   useEffect(() => {
     if (userProfile?.avatar_url) {
       setLocalAvatarPreviewUrl(userProfile.avatar_url);
-    } else if (userProfile) { // If profile exists but no avatar_url, clear preview
+    } else if (userProfile) {
         setLocalAvatarPreviewUrl(null);
     }
   }, [userProfile]);
@@ -49,6 +48,11 @@ export default function AccountPage() {
     }
 
     const file = event.target.files[0];
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit for avatars
+       toast({ title: "Avatar Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
+       if (fileInputRef.current) fileInputRef.current.value = ""; // Clear input
+       return;
+    }
     
     const formData = new FormData();
     formData.append('avatar', file);
@@ -57,26 +61,24 @@ export default function AccountPage() {
     const loadingToastId = toast({ title: "Uploading avatar...", description: "Please wait.", duration: Infinity }).id;
 
     try {
-      const response = await fetch('/api/profile', {
+      const response = await fetch('/api/profile', { // Make sure this API route exists and handles PUT requests
         method: 'PUT',
         body: formData,
-        // Headers are not explicitly set for FormData; browser handles multipart/form-data
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Server error during avatar upload."}));
-        throw new Error(errorData.error || 'Avatar upload failed');
+        throw new Error(errorData.error || 'Avatar upload failed. Ensure /api/profile (PUT) is implemented.');
       }
 
       const result = await response.json();
 
       if (result.success && result.avatarUrl) {
         setLocalAvatarPreviewUrl(result.avatarUrl);
-        // Update AppContext's userProfile if the API returns the full updated profile or at least the new avatar_url
         if (setUserProfile && userProfile) {
             setUserProfile({...userProfile, avatar_url: result.avatarUrl });
         }
-        toast({ title: 'Avatar Uploaded Successfully!' });
+        toast({ title: 'Avatar Uploaded Successfully!', description: 'Your profile picture has been updated.' });
       } else {
         throw new Error(result.error || 'Failed to get avatar URL from API response.');
       }
@@ -87,7 +89,6 @@ export default function AccountPage() {
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsUploadingAvatar(false);
-      // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -95,7 +96,7 @@ export default function AccountPage() {
   };
 
 
-  if (isLoadingAuth || (!authUser && !userProfile)) {
+  if (isLoadingAuth || (!authUser && !userProfile && typeof window !== 'undefined' && !isLoadingAuth)) { // Added !isLoadingAuth to avoid flicker if initial check is fast
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -103,7 +104,7 @@ export default function AccountPage() {
     );
   }
   
-  if (authUser && !userProfile && !isLoadingAuth) { // Auth user exists, but profile still loading or failed
+  if (authUser && !userProfile && !isLoadingAuth) {
      return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -112,8 +113,8 @@ export default function AccountPage() {
     );
   }
 
-  if (!authUser || !userProfile) { // Should be caught by useEffect, but safeguard
-      router.push('/auth/signin');
+  if (!authUser || !userProfile) {
+      // useEffect will handle redirect, this is a fallback render during the brief redirect period.
       return (
            <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -122,9 +123,8 @@ export default function AccountPage() {
       );
   }
 
-
   const userDisplay = {
-    name: userProfile.name || "User",
+    name: userProfile.name || "Valued Customer",
     email: userProfile.email,
     avatarUrl: localAvatarPreviewUrl || userProfile.avatar_url || `https://placehold.co/100x100.png?text=${(userProfile.name || userProfile.email || 'U').substring(0,1).toUpperCase()}`,
     initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email?.substring(0,2).toUpperCase() || 'U'),
@@ -132,6 +132,7 @@ export default function AccountPage() {
 
   const handleLogout = async () => {
     await signOut();
+    // router.push('/') is handled by AppContext signOut now.
   };
 
   return (
@@ -157,13 +158,13 @@ export default function AccountPage() {
                   title="Change Profile Picture"
                   disabled={isUploadingAvatar}
                 >
-                  {isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />}
+                  {isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                 </Button>
                 <Input 
                     type="file" 
                     ref={fileInputRef} 
                     className="hidden" 
-                    accept="image/*" 
+                    accept="image/png, image/jpeg, image/gif" 
                     onChange={handleAvatarUpload}
                     disabled={isUploadingAvatar}
                 />
@@ -172,11 +173,11 @@ export default function AccountPage() {
               <CardDescription>{userDisplay.email}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full">
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Details
+              <Button variant="outline" className="w-full" disabled>
+                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Details (Soon)
               </Button>
                <p className="text-xs text-muted-foreground text-center pt-1">
-                Avatar upload interacts with an API. Ensure your backend handles the avatar update and persists the URL.
+                Avatar upload requires backend API at /api/profile (PUT) to be implemented for persistence.
               </p>
             </CardContent>
           </Card>
@@ -190,12 +191,12 @@ export default function AccountPage() {
           <Card>
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Manage your personal details.</CardDescription>
+              <CardDescription>Manage your personal details. (Editing disabled for now)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" defaultValue={userDisplay.name} />
+                <Input id="name" defaultValue={userDisplay.name} disabled />
               </div>
               <div>
                 <Label htmlFor="email">Email Address</Label>
@@ -203,9 +204,9 @@ export default function AccountPage() {
               </div>
               <div>
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
-                <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" />
+                <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" disabled />
               </div>
-               <Button>Save Changes</Button>
+               <Button disabled>Save Changes (Soon)</Button>
             </CardContent>
           </Card>
 
@@ -216,22 +217,26 @@ export default function AccountPage() {
             <CardContent className="space-y-1">
               {[
                 { label: "Order History", icon: ShoppingBasket, href: "/account/orders" },
-                { label: "Saved Addresses", icon: MapPin, href: "#" },
-                { label: "Payment Methods", icon: CreditCard, href: "#" },
+                { label: "Saved Addresses", icon: MapPin, href: "#", disabled: true },
+                { label: "Payment Methods", icon: CreditCard, href: "#", disabled: true },
                 { label: "Notification Preferences", icon: Bell, href: "/settings" },
-                { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context") }, // Replace with actual toggleWishlist or similar
-                { label: "Security & Password", icon: ShieldCheck, href: "#" },
+                { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context (Not Implemented as page)"), disabled: true },
+                { label: "Security & Password", icon: ShieldCheck, href: "#", disabled: true },
                 { label: "Help & Support", icon: MessageSquareQuote, href: "/help" },
               ].map(item => (
                 <React.Fragment key={item.label}>
                   <Link
-                    href={item.href}
-                    className="flex items-center justify-between p-3 rounded-md hover:bg-secondary transition-colors"
-                    onClick={item.action}
+                    href={item.disabled ? "#" : item.href}
+                    className={`flex items-center justify-between p-3 rounded-md transition-colors ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary'}`}
+                    onClick={(e) => { 
+                        if (item.disabled) e.preventDefault();
+                        else if (item.action) item.action();
+                    }}
+                    aria-disabled={item.disabled}
                   >
                     <div className="flex items-center gap-3">
                       <item.icon className="h-5 w-5 text-primary" />
-                      <span>{item.label}</span>
+                      <span>{item.label} {item.disabled ? "(Soon)" : ""}</span>
                     </div>
                     <Edit3 className="h-4 w-4 text-muted-foreground" />
                   </Link>
@@ -245,5 +250,4 @@ export default function AccountPage() {
     </div>
   );
 }
-
     
