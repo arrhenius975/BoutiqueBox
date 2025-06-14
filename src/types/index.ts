@@ -21,7 +21,11 @@ export type ProductCategory =
   | 'burgers'
   | 'pizza'
   | 'sides'
-  | 'drinks';
+  | 'drinks'
+  // Example additional categories for admin
+  | 'electronics'
+  | 'clothing'
+  | 'books';
 
 // Frontend Product type, used by UI components and AppContext.
 export interface Product {
@@ -43,7 +47,15 @@ export interface CartItem extends Product {
 export interface WishlistItem extends Product {}
 
 // Represents the main sections of the app
-export type AppSection = 'grocery' | 'cosmetics' | 'fastfood';
+export type AppSection =
+  | 'grocery'
+  | 'cosmetics'
+  | 'fastfood'
+  // Example additional sections for admin category grouping
+  | 'tech'
+  | 'fashion'
+  | 'literature'
+  | 'other'; // A general section if needed
 
 export interface SectionCategory {
   value: ProductCategory;
@@ -89,6 +101,7 @@ export interface SupabaseUser {
   auth_id: string; // uuid, not null, unique (Linked to Supabase Auth)
   email: string; // text, not null, unique
   name?: string | null; // text
+  avatar_url?: string | null; // text, added for profile pictures
   role: 'admin' | 'staff' | 'customer' | string; // text, default 'customer'
   created_at: string; // timestamp
 }
@@ -115,6 +128,7 @@ export interface SupabaseProduct {
   brand_id?: number | null; // integer, references brands(id)
   created_at: string; // timestamp
   updated_at: string; // timestamp
+  data_ai_hint?: string | null; // Added to match product data
 }
 
 export interface SupabaseProductImage {
