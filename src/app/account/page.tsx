@@ -25,7 +25,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!isLoadingAuth && !authUser) {
-      router.push('/auth/signin');
+      router.push('/signin'); // Corrected path from /auth/signin
     }
   }, [authUser, isLoadingAuth, router]);
 
@@ -33,7 +33,7 @@ export default function AccountPage() {
     if (userProfile?.avatar_url) {
       setLocalAvatarPreviewUrl(userProfile.avatar_url);
     } else if (userProfile) {
-        setLocalAvatarPreviewUrl(null);
+        setLocalAvatarPreviewUrl(null); // Explicitly set to null if no avatar_url in profile
     }
   }, [userProfile]);
 
@@ -61,21 +61,21 @@ export default function AccountPage() {
     const loadingToastId = toast({ title: "Uploading avatar...", description: "Please wait.", duration: Infinity }).id;
 
     try {
-      const response = await fetch('/api/profile', { // Make sure this API route exists and handles PUT requests
+      const response = await fetch('/api/profile', {
         method: 'PUT',
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Server error during avatar upload."}));
-        throw new Error(errorData.error || 'Avatar upload failed. Ensure /api/profile (PUT) is implemented.');
+        throw new Error(errorData.error || 'Avatar upload failed. Ensure /api/profile (PUT) is implemented correctly.');
       }
 
       const result = await response.json();
 
       if (result.success && result.avatarUrl) {
-        setLocalAvatarPreviewUrl(result.avatarUrl);
-        if (setUserProfile && userProfile) {
+        setLocalAvatarPreviewUrl(result.avatarUrl); // Update local preview immediately
+        if (setUserProfile && userProfile) { // Update context state
             setUserProfile({...userProfile, avatar_url: result.avatarUrl });
         }
         toast({ title: 'Avatar Uploaded Successfully!', description: 'Your profile picture has been updated.' });
@@ -89,14 +89,14 @@ export default function AccountPage() {
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsUploadingAvatar(false);
-      if (fileInputRef.current) {
+      if (fileInputRef.current) { // Clear file input regardless of success/failure
         fileInputRef.current.value = "";
       }
     }
   };
 
 
-  if (isLoadingAuth || (!authUser && !userProfile && typeof window !== 'undefined' && !isLoadingAuth)) { // Added !isLoadingAuth to avoid flicker if initial check is fast
+  if (isLoadingAuth || (!authUser && !userProfile && typeof window !== 'undefined' && !isLoadingAuth)) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -114,7 +114,6 @@ export default function AccountPage() {
   }
 
   if (!authUser || !userProfile) {
-      // useEffect will handle redirect, this is a fallback render during the brief redirect period.
       return (
            <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -126,6 +125,7 @@ export default function AccountPage() {
   const userDisplay = {
     name: userProfile.name || "Valued Customer",
     email: userProfile.email,
+    // Use localAvatarPreviewUrl first for immediate feedback, then context's userProfile.avatar_url, then placeholder
     avatarUrl: localAvatarPreviewUrl || userProfile.avatar_url || `https://placehold.co/100x100.png?text=${(userProfile.name || userProfile.email || 'U').substring(0,1).toUpperCase()}`,
     initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email?.substring(0,2).toUpperCase() || 'U'),
   };
@@ -142,6 +142,7 @@ export default function AccountPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Left Column: Profile Card and Logout */}
         <div className="md:col-span-1 space-y-6">
           <Card>
             <CardHeader className="items-center text-center">
@@ -187,6 +188,7 @@ export default function AccountPage() {
           </Button>
         </div>
 
+        {/* Right Column: Personal Info and Account Options */}
         <div className="md:col-span-2 space-y-8">
           <Card>
             <CardHeader>
@@ -238,7 +240,7 @@ export default function AccountPage() {
                       <item.icon className="h-5 w-5 text-primary" />
                       <span>{item.label} {item.disabled ? "(Soon)" : ""}</span>
                     </div>
-                    <Edit3 className="h-4 w-4 text-muted-foreground" />
+                    <Edit3 className="h-4 w-4 text-muted-foreground" /> {/* Replaced ChevronRight with Edit3 for a more "manage" feel */}
                   </Link>
                   <Separator />
                 </React.Fragment>
@@ -250,4 +252,6 @@ export default function AccountPage() {
     </div>
   );
 }
+    
+
     
