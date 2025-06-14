@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Loader2 } from 'lucide-react';
+import { LogIn, Loader2, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppContext } from '@/contexts/AppContext';
@@ -114,6 +114,12 @@ export default function SignInPage() {
               Sign Up
             </Link>
           </p>
+          <div className="mt-2 border-t pt-3 w-full flex justify-center">
+            <Link href="/signin?redirect=/admin/dashboard" className="text-sm font-medium text-muted-foreground hover:text-primary hover:underline flex items-center gap-1">
+              <ShieldCheck className="h-4 w-4" />
+              Admin Login
+            </Link>
+          </div>
         </CardFooter>
       </form>
     </Card>

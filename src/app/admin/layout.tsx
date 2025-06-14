@@ -23,7 +23,7 @@ export default function AdminLayout({
     if (!isLoadingAuth) { 
       if (!authUser) {
         toast({ title: "Authentication Required", description: "Please sign in to access the admin area.", variant: "destructive"});
-        router.push('/auth/signin?redirect=/admin/dashboard');
+        router.push('/signin?redirect=/admin/dashboard'); // Corrected path
       } else if (userProfile && userProfile.role !== 'admin') {
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
         router.push('/not-authorized'); 
@@ -36,7 +36,7 @@ export default function AdminLayout({
   }, [authUser, userProfile, isLoadingAuth, router, toast]);
 
 
-  if (isLoadingAuth || (authUser && !userProfile && !isLoadingAuth)) { // Modified condition to be more robust
+  if (isLoadingAuth || (authUser && !userProfile && !isLoadingAuth)) { 
     return (
       <>
         <ThemeManager themeClass="" />
@@ -48,8 +48,6 @@ export default function AdminLayout({
     );
   }
   
-  // If, after loading, user is not an admin or not logged in, redirect has already been initiated by useEffect.
-  // This check prevents rendering admin content prematurely or to unauthorized users.
   if (!authUser || (userProfile && userProfile.role !== 'admin')) {
      return (
        <>
@@ -68,7 +66,7 @@ export default function AdminLayout({
       <ThemeManager themeClass="" /> 
       <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
         <AdminSidebar />
-        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64">
+        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64"> {/* Ensure ml-0 md:ml-64 for sidebar spacing */}
           {children}
         </main>
       </div>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2 } from 'lucide-react';
+import { UserPlus, Loader2, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/AppContext';
@@ -32,9 +32,7 @@ export default function SignUpPage() {
     const success = await signUpWithEmail(name, email, password);
     setIsSubmitting(false);
     if (success) {
-      // User will get a verification email. Redirect to sign-in or a "please verify" page.
-      // For now, redirect to sign-in page. AppContext onAuthStateChange will handle full login after verification.
-      router.push('/signin'); // Corrected path
+      router.push('/signin');
     }
   };
 
@@ -125,10 +123,16 @@ export default function SignUpPage() {
           </Button>
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/signin" className="font-medium text-primary hover:underline"> {/* Corrected path */}
+            <Link href="/signin" className="font-medium text-primary hover:underline">
               Sign In
             </Link>
           </p>
+          <div className="mt-2 border-t pt-3 w-full flex justify-center">
+            <Link href="/signin?redirect=/admin/dashboard" className="text-sm font-medium text-muted-foreground hover:text-primary hover:underline flex items-center gap-1">
+              <ShieldCheck className="h-4 w-4" />
+              Admin Login
+            </Link>
+          </div>
         </CardFooter>
       </form>
     </Card>
