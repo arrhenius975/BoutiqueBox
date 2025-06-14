@@ -1,8 +1,11 @@
 
+// src/types/index.ts
+
+// --- Frontend UI Specific Types ---
+// These types are used by UI components and AppContext.
+// Data fetched from Supabase would typically be transformed into these types for display.
+
 // Represents sub-categories within a main section (Grocery, Cosmetics, FastFood)
-// 'all' is a general filter, specific sub-categories follow.
-// This is a frontend-specific type for UI filtering based on current mock data structure.
-// The backend Supabase schema uses an integer category_id.
 export type ProductCategory =
   | 'all'
   // Grocery
@@ -21,13 +24,12 @@ export type ProductCategory =
   | 'drinks';
 
 // Frontend Product type, used by UI components and AppContext.
-// Assumes data might be transformed from SupabaseProduct for display.
 export interface Product {
   id: string; // Matches Supabase product.id (uuid)
   name: string;
   description: string;
   price: number;
-  image: string; // Typically the primary image URL
+  image: string; // Typically the primary image URL from SupabaseProductImage
   category: ProductCategory; // Frontend specific sub-category string
   'data-ai-hint': string;
 }
@@ -44,7 +46,7 @@ export interface WishlistItem extends Product {}
 export type AppSection = 'grocery' | 'cosmetics' | 'fastfood';
 
 export interface SectionCategory {
-  value: ProductCategory; // Matches the frontend string-based category filter
+  value: ProductCategory;
   label: string;
   icon: React.ElementType; // Lucide icon component
 }
@@ -54,7 +56,7 @@ export interface SectionConfig {
   path: string;
   themeClass: string;
   products: Product[]; // Uses the frontend Product type
-  categories: SectionCategory[]; // Uses frontend SectionCategory type
+  categories: SectionCategory[];
   hero: {
     title: string;
     subtitle: string;
@@ -63,34 +65,50 @@ export interface SectionConfig {
 
 export type SearchFilterType = 'all' | 'name' | 'description';
 
+// Mock type used in frontend for Order History page display
+export interface DisplayOrder {
+  id: string;
+  date: string;
+  status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | string;
+  totalAmount: number;
+  items: Array<{
+    id: string; // Product ID
+    name: string;
+    quantity: number;
+    price: number; // Price per item at time of order
+    image: string;
+    'data-ai-hint': string;
+  }>;
+}
 
-// --- Supabase Specific Types based on the LATEST SQL Schema ---
+
+// --- Supabase Specific Types (Aligned with the provided SQL schema) ---
 
 export interface SupabaseUser {
   id: string; // uuid, primary key
-  email: string; // text, unique not null
-  // password field is not typically included in client-side types for security
-  name?: string; // text
-  role: 'admin' | 'customer' | string; // text, default 'customer'
+  auth_id: string; // uuid, not null, unique (Linked to Supabase Auth)
+  email: string; // text, not null, unique
+  name?: string | null; // text
+  role: 'admin' | 'staff' | 'customer' | string; // text, default 'customer'
   created_at: string; // timestamp
 }
 
 export interface SupabaseCategory {
   id: number; // serial, primary key
   name: string; // text, not null, unique
-  description?: string; // text
+  description?: string | null; // text
 }
 
 export interface SupabaseBrand {
   id: number; // serial, primary key
   name: string; // text, not null, unique
-  description?: string; // text
+  description?: string | null; // text
 }
 
 export interface SupabaseProduct {
   id: string; // uuid, primary key
   name: string; // text, not null
-  description?: string; // text
+  description?: string | null; // text
   price: number; // numeric(10, 2), not null
   stock: number; // integer, default 0
   category_id?: number | null; // integer, references categories(id)
@@ -106,10 +124,39 @@ export interface SupabaseProductImage {
   is_primary: boolean; // boolean, default false
 }
 
+export interface SupabaseCartItem {
+  id: number; // serial, primary key
+  user_id?: string | null; // uuid, references users(id)
+  product_id?: string | null; // uuid, references products(id)
+  quantity: number; // integer, not null
+  added_at: string; // timestamp
+}
+
+export interface SupabaseWishlistItem {
+  id: number; // serial, primary key
+  user_id?: string | null; // uuid, references users(id)
+  product_id?: string | null; // uuid, references products(id)
+  added_at: string; // timestamp
+}
+
+export interface SupabaseDraftOrder {
+  id: string; // uuid, primary key
+  user_id?: string | null; // uuid, references users(id)
+  status: string; // text, default 'draft'
+  created_at: string; // timestamp
+}
+
+export interface SupabaseDraftOrderItem {
+  id: number; // serial, primary key
+  draft_order_id: string; // uuid, references draft_orders(id)
+  product_id?: string | null; // uuid, references products(id)
+  quantity: number; // integer, not null
+}
+
 export interface SupabaseOrder {
   id: string; // uuid, primary key
-  user_id?: string; // uuid, references users(id)
-  total_amount?: number; // numeric(10, 2)
+  user_id?: string | null; // uuid, references users(id)
+  total_amount?: number | null; // numeric(10, 2)
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | string; // text, default 'pending'
   created_at: string; // timestamp
 }
@@ -117,75 +164,73 @@ export interface SupabaseOrder {
 export interface SupabaseOrderItem {
   id: number; // serial, primary key
   order_id: string; // uuid, references orders(id)
-  product_id?: string; // uuid, references products(id)
+  product_id?: string | null; // uuid, references products(id)
   quantity: number; // integer, not null
   price: number; // numeric(10, 2), not null (price at time of order)
 }
 
 export interface SupabasePayment {
   id: string; // uuid, primary key
-  order_id?: string; // uuid, references orders(id)
-  payment_method?: string; // text
+  order_id?: string | null; // uuid, references orders(id)
+  payment_method?: string | null; // text
   payment_status: string; // text, default 'pending'
-  paid_at?: string; // timestamp
+  paid_at?: string | null; // timestamp
 }
 
-export interface SupabaseAddress {
+export interface SupabaseRefund {
   id: number; // serial, primary key
-  user_id?: string; // uuid, references users(id)
-  full_name?: string; // text
-  street?: string; // text
-  city?: string; // text
-  state?: string; // text
-  zip?: string; // text
-  country?: string; // text
-  phone?: string; // text
-  is_default: boolean; // boolean, default false
+  order_id?: string | null; // uuid, references orders(id)
+  reason?: string | null; // text
+  status: 'pending' | 'approved' | 'rejected' | string; // text, default 'pending'
+  requested_at: string; // timestamp
+  resolved_at?: string | null; // timestamp
+}
+
+export interface SupabaseManualOrder {
+  id: string; // uuid, primary key
+  created_by?: string | null; // uuid, references users(id)
+  user_id?: string | null; // uuid, references users(id)
+  total_amount?: number | null; // numeric(10, 2)
+  note?: string | null; // text
+  created_at: string; // timestamp
+}
+
+export interface SupabaseManualOrderItem {
+  id: number; // serial, primary key
+  manual_order_id?: string | null; // uuid, references manual_orders(id)
+  product_id?: string | null; // uuid, references products(id)
+  quantity?: number | null; // integer
+  price?: number | null; // numeric(10, 2)
+}
+
+export interface SupabaseInventoryAlert {
+  id: number; // serial, primary key
+  product_id?: string | null; // uuid, references products(id)
+  threshold: number; // integer, not null, default 5
+  alerted: boolean; // boolean, default false
 }
 
 export interface SupabaseReview {
   id: number; // serial, primary key
-  user_id?: string; // uuid, references users(id)
-  product_id?: string; // uuid, references products(id)
-  rating?: number; // integer, check (rating between 1 and 5)
-  comment?: string; // text
+  user_id?: string | null; // uuid, references users(id)
+  product_id?: string | null; // uuid, references products(id)
+  rating?: number | null; // integer, check (rating between 1 and 5)
+  comment?: string | null; // text
   created_at: string; // timestamp
   updated_at: string; // timestamp
 }
 
-export interface SupabaseWishlistItemEntry { // Renamed to avoid clash with UI WishlistItem
+export interface SupabaseAddress {
   id: number; // serial, primary key
-  user_id?: string; // uuid, references users(id)
-  product_id?: string; // uuid, references products(id)
-  added_at: string; // timestamp
+  user_id?: string | null; // uuid, references users(id)
+  full_name?: string | null; // text
+  street?: string | null; // text
+  city?: string | null; // text
+  state?: string | null; // text
+  zip?: string | null; // text
+  country?: string | null; // text
+  phone?: string | null; // text
+  is_default: boolean; // boolean, default false
 }
 
-// Note: The following types from a previous schema iteration are no longer present
-// in the latest SQL and are thus removed:
-// - SupabaseCartItem (cart logic might be handled differently or client-side before order creation)
-// - DraftOrder
-// - DraftOrderItem
-// - RefundRequest (schema name 'refunds' is not present in the latest user-provided SQL)
-// - InventoryAlert
-// - ManualOrder
-// - ManualOrderItem
-// If 'refunds' table was intended to be `refund_requests`, it would need to be re-added.
-// The current 'cart_items' table from the first SQL provided by user is also not in the latest SQL.
-// The latest SQL only has 'orders' and 'order_items'. Client-side cart state will be used until an order is created.
-
-// Mock type used in frontend for Order History page display, can be adapted
-// once SupabaseOrder and SupabaseOrderItem are fetched and combined.
-export interface DisplayOrder {
-  id: string;
-  date: string;
-  status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | string; // Allow for Supabase statuses
-  totalAmount: number;
-  items: Array<{ // This structure is for display, derived from SupabaseOrderItem & SupabaseProduct
-    id: string; // Product ID
-    name: string;
-    quantity: number;
-    price: number; // Price per item at time of order
-    image: string;
-    'data-ai-hint': string;
-  }>;
-}
+    
