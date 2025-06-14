@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ThemeManager } from '@/components/ThemeManager';
 import { useAppContext } from '@/contexts/AppContext';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -16,26 +17,26 @@ export default function AdminLayout({
 }) {
   const { authUser, userProfile, isLoadingAuth } = useAppContext();
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
-    if (!isLoadingAuth) { // Only run checks once auth state is resolved
+    if (!isLoadingAuth) { 
       if (!authUser) {
-        // Not logged in, redirect to sign-in
-        router.push('/auth/signin?redirect=/admin/dashboard'); // Optional: add redirect query
+        toast({ title: "Authentication Required", description: "Please sign in to access the admin area.", variant: "destructive"});
+        router.push('/auth/signin?redirect=/admin/dashboard');
       } else if (userProfile && userProfile.role !== 'admin') {
-        // Logged in, but not an admin, redirect to home or account page
         toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
-        router.push('/account'); 
-      } else if (!userProfile && authUser) {
-        // Auth user exists, but profile (with role) is not yet loaded.
-        // This state is usually brief. The loader below handles it.
-        // If it persists, it might indicate an issue fetching the profile.
+        router.push('/not-authorized'); 
+      } else if (authUser && !userProfile) {
+        // Still waiting for profile to load role. Loader handles this.
+        // If this state persists, it might indicate an issue fetching the profile or missing role column.
+        console.warn("AdminLayout: Auth user exists, but profile (with role) is not yet loaded. Ensure 'role' column exists in 'users' table.");
       }
     }
-  }, [authUser, userProfile, isLoadingAuth, router]);
+  }, [authUser, userProfile, isLoadingAuth, router, toast]);
 
-  // Show loading state while auth/profile is being determined
-  if (isLoadingAuth || (authUser && !userProfile)) {
+
+  if (isLoadingAuth || (authUser && !userProfile && !isLoadingAuth)) { // Modified condition to be more robust
     return (
       <>
         <ThemeManager themeClass="" />
@@ -64,15 +65,13 @@ export default function AdminLayout({
   // User is authenticated and is an admin
   return (
     <>
-      <ThemeManager themeClass="" /> {/* Clears section-specific themes */}
+      <ThemeManager themeClass="" /> 
       <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
         <AdminSidebar />
-        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64"> {/* Adjust ml-64 if sidebar width changes */}
+        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64">
           {children}
         </main>
       </div>
     </>
   );
 }
-
-    
