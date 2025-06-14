@@ -233,7 +233,7 @@ export function Header() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/signin" passHref> {/* Corrected path */}
+              <Link href="/signin" passHref>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -257,7 +257,8 @@ export function Header() {
               const radian = angle * (Math.PI / 180);
 
               const x = categoryArcRadius * Math.sin(radian);
-              const y = categoryArcRadius * (1 - Math.cos(radian)) + yOffsetForArc;
+              // Changed y calculation for U-shape arc
+              const y = yOffsetForArc + categoryArcRadius * Math.cos(radian);
 
               const iconSizeClass = "w-12 h-12 sm:w-14 sm:h-14";
 
