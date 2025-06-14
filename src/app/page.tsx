@@ -443,13 +443,14 @@ const BoutiqueBoxLanding = () => {
       </div>
 
       {/* Sticky Button to Sections Page */}
-      <Link href="/sections" legacyBehavior>
-        <a className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center group">
-          <ShoppingBag className="h-6 w-6" />
-          <span className="absolute right-full mr-2 -translate-y-1/2 top-1/2 bg-background text-foreground px-2 py-1 rounded text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Explore Stores
-          </span>
-        </a>
+      <Link
+        href="/sections"
+        className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center group"
+      >
+        <ShoppingBag className="h-6 w-6" />
+        <span className="absolute right-full mr-2 -translate-y-1/2 top-1/2 bg-background text-foreground px-2 py-1 rounded text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Explore Stores
+        </span>
       </Link>
 
     </div>
@@ -457,3 +458,4 @@ const BoutiqueBoxLanding = () => {
 };
 
 export default BoutiqueBoxLanding;
+
