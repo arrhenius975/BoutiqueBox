@@ -1,9 +1,8 @@
 
 import type {Metadata} from 'next';
 import './globals.css';
-import { AppProvider } from '@/contexts/AppContext';
-import { Toaster } from "@/components/ui/toaster";
-// LayoutComponent and BottomNavBar are now part of section-specific layouts or conditionally rendered.
+import { ClientProviders } from '@/contexts/ClientProviders'; // Import the new wrapper
+// AppProvider and Toaster are now handled by ClientProviders
 
 export const metadata: Metadata = {
   title: 'BoutiqueBox - Your Multi-Store App',
@@ -23,12 +22,9 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        {/* AppProvider is moved to section-specific layouts to re-initialize with section data */}
-        {/* Or AppProvider in root needs to be section-aware via usePathname */}
-        <AppProvider>
+        <ClientProviders> {/* Use the client component wrapper */}
           {children}
-          <Toaster />
-        </AppProvider>
+        </ClientProviders>
       </body>
     </html>
   );
