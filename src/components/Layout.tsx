@@ -6,15 +6,15 @@ import { Header } from '@/components/Header';
 import { CartSidebar } from '@/components/CartSidebar';
 import { WishlistSidebar } from '@/components/WishlistSidebar';
 import { PersonalizedRecommendationsModal } from '@/components/PersonalizedRecommendationsModal';
-import { BottomNavBar } from '@/components/BottomNavBar'; // Import the new BottomNavBar
+import { BottomNavBar } from '@/components/BottomNavBar'; 
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-export function LayoutComponent({ children }: LayoutProps) { // Renamed to LayoutComponent
+export function LayoutComponent({ children }: LayoutProps) { 
   return (
-    <div className="flex min-h-screen flex-col pb-16 md:pb-0"> {/* Added padding for bottom nav on mobile */}
+    <div className="flex min-h-screen flex-col"> {/* Removed pb-16 md:pb-0 */}
       <Header />
       <main className="flex-1">
         {children}
@@ -22,8 +22,7 @@ export function LayoutComponent({ children }: LayoutProps) { // Renamed to Layou
       <CartSidebar />
       <WishlistSidebar />
       <PersonalizedRecommendationsModal />
-      <BottomNavBar /> {/* Add the new BottomNavBar here */}
-      {/* Footer removed as per request */}
+      <BottomNavBar /> 
     </div>
   );
 }
