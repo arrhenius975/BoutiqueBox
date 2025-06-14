@@ -2,81 +2,97 @@
 // src/app/account/orders/page.tsx
 "use client";
 
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Package, Receipt, HelpCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, Package, Receipt, HelpCircle, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import type { DisplayOrder } from '@/types'; // Use the shared type
 
-interface OrderItem {
-  id: string;
-  name: string;
-  quantity: number;
-  price: number;
-  image: string;
-  'data-ai-hint': string;
-}
-
-interface Order {
-  id: string;
-  date: string;
-  status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled';
-  totalAmount: number;
-  items: OrderItem[];
-}
-
-// Mock Data - In a real app, this would come from an API
-const mockOrders: Order[] = [
-  {
-    id: 'ORD746298',
-    date: '2024-03-08',
-    status: 'Delivered',
-    totalAmount: 85.97,
-    items: [
-      { id: 'g-m1', name: 'Chicken Breast', quantity: 2, price: 7.99, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'chicken' },
-      { id: 'g-v3', name: 'Deshi Gajor (Carrots)', quantity: 1, price: 1.99, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'carrots' },
-      { id: 'c-s1', name: 'Hydrating Face Cream', quantity: 1, price: 24.99, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'cream' },
-    ],
-  },
-  {
-    id: 'ORD364710',
-    date: '2024-02-25',
-    status: 'Shipped',
-    totalAmount: 33.48,
-    items: [
-      { id: 'ff-b1', name: 'Classic Cheeseburger', quantity: 2, price: 8.99, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'burger' },
-      { id: 'ff-d1', name: 'Cola Classic', quantity: 2, price: 2.50, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'cola' },
-    ],
-  },
-   {
-    id: 'ORD102937',
-    date: '2024-01-15',
-    status: 'Cancelled',
-    totalAmount: 18.00,
-    items: [
-      { id: 'c-m1', name: 'Velvet Matte Lipstick', quantity: 1, price: 18.00, image: 'https://placehold.co/80x80.png', 'data-ai-hint': 'lipstick' },
-    ],
-  },
-];
-
-const getStatusBadgeVariant = (status: Order['status']) => {
+const getStatusBadgeVariant = (status: DisplayOrder['status']) => {
   switch (status) {
-    case 'Delivered': return 'default'; // Using primary color for "good" status
+    case 'Delivered': return 'default';
     case 'Shipped': return 'secondary';
-    case 'Processing': return 'outline'; // Needs a more distinct "processing" visual
+    case 'Processing': return 'outline';
     case 'Cancelled': return 'destructive';
+    case 'pending': return 'outline'; // Assuming 'pending' might be a status
+    case 'paid': return 'default'; // Assuming 'paid' is like a delivered/good status
     default: return 'outline';
   }
 };
 
-
 export default function OrderHistoryPage() {
   const router = useRouter();
-  // In a real app, fetch orders for the logged-in user
-  const orders = mockOrders;
+  const { toast } = useToast();
+  const [orders, setOrders] = useState<DisplayOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/orders');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch orders. Please try again.' }));
+        throw new Error(errorData.error || 'Server error');
+      }
+      const data: DisplayOrder[] = await response.json();
+      setOrders(data);
+    } catch (err: any) {
+      console.error("Fetch orders error:", err);
+      setError(err.message || 'An unexpected error occurred.');
+      toast({
+        title: "Error Fetching Orders",
+        description: err.message || 'Could not load your order history.',
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading your orders...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+         <header className="mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <Button variant="outline" size="icon" onClick={() => router.back()} className="h-9 w-9">
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <h1 className="font-headline text-3xl font-bold text-primary">Order History</h1>
+            </div>
+        </header>
+        <Alert variant="destructive" className="max-w-2xl mx-auto">
+          <AlertTriangle className="h-5 w-5" />
+          <AlertTitle>Error Loading Orders</AlertTitle>
+          <AlertDescription>
+            {error} Please try again later or contact support if the issue persists.
+            <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2">Try again</Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -117,7 +133,7 @@ export default function OrderHistoryPage() {
                         <h2 className="text-lg font-semibold">Order ID: {order.id}</h2>
                         <p className="text-sm text-muted-foreground">Placed on: {new Date(order.date).toLocaleDateString()}</p>
                     </div>
-                    <Badge variant={getStatusBadgeVariant(order.status)} className="text-sm px-3 py-1">{order.status}</Badge>
+                    <Badge variant={getStatusBadgeVariant(order.status)} className="text-sm px-3 py-1 capitalize">{order.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-4 md:p-6">
@@ -125,7 +141,13 @@ export default function OrderHistoryPage() {
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-4">
                       <div className="relative h-16 w-16 rounded-md border overflow-hidden bg-white">
-                         <Image src={item.image} alt={item.name} layout="fill" objectFit="contain" data-ai-hint={item['data-ai-hint']}/>
+                         <Image 
+                            src={item.image || `https://placehold.co/80x80.png?text=${item.name.substring(0,1)}`} 
+                            alt={item.name} 
+                            layout="fill" 
+                            objectFit="contain" 
+                            data-ai-hint={item['data-ai-hint'] || 'product item'}
+                          />
                       </div>
                       <div className="flex-grow">
                         <h4 className="font-medium">{item.name}</h4>
@@ -141,20 +163,17 @@ export default function OrderHistoryPage() {
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/50 dark:bg-muted/20 p-4 border-t flex flex-col sm:flex-row justify-end items-center gap-2">
-                <Button variant="outline" size="sm">
-                    <Receipt className="mr-2 h-4 w-4" /> View Invoice
+                <Button variant="outline" size="sm" disabled>
+                    <Receipt className="mr-2 h-4 w-4" /> View Invoice (Soon)
                 </Button>
-                <Button variant="outline" size="sm">
-                    <Package className="mr-2 h-4 w-4" /> Track Package
+                <Button variant="outline" size="sm" disabled>
+                    <Package className="mr-2 h-4 w-4" /> Track Package (Soon)
                 </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       )}
-      <p className="text-sm text-muted-foreground text-center mt-12">
-        This is a demonstration of an order history page. Backend integration is needed for real data.
-      </p>
     </div>
   );
 }
