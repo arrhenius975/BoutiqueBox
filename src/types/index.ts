@@ -22,10 +22,9 @@ export type ProductCategory =
   | 'pizza'
   | 'sides'
   | 'drinks'
-  // Example additional categories for admin
-  | 'electronics'
-  | 'clothing'
-  | 'books';
+  // Categories managed by admin will have string names, these are examples.
+  // The actual values might come from `SupabaseCategory.name.toLowerCase()`
+  | string; // Allows for dynamically added category names
 
 // Frontend Product type, used by UI components and AppContext.
 export interface Product {
@@ -34,7 +33,8 @@ export interface Product {
   description: string;
   price: number;
   image: string; // Typically the primary image URL from SupabaseProductImage
-  category: ProductCategory; // Frontend specific sub-category string
+  category: ProductCategory; // Frontend specific sub-category string (e.g., from category_id.name)
+  category_id?: number; // Added to hold the actual category ID for convenience
   'data-ai-hint': string;
 }
 
@@ -58,9 +58,10 @@ export type AppSection =
   | 'other'; // A general section if needed
 
 export interface SectionCategory {
-  value: ProductCategory;
+  value: ProductCategory; // This is the string name like 'meats' or 'all'
   label: string;
   icon: React.ElementType; // Lucide icon component
+  id?: number; // Optional: if this maps to a DB category ID
 }
 
 export interface SectionConfig {
@@ -68,7 +69,7 @@ export interface SectionConfig {
   path: string;
   themeClass: string;
   products: Product[]; // Uses the frontend Product type
-  categories: SectionCategory[];
+  categories: SectionCategory[]; // These are the hardcoded section categories for main app navigation
   hero: {
     title: string;
     subtitle: string;
@@ -110,6 +111,8 @@ export interface SupabaseCategory {
   id: number; // serial, primary key
   name: string; // text, not null, unique
   description?: string | null; // text
+  created_at?: string; // timestamp
+  updated_at?: string; // timestamp
 }
 
 export interface SupabaseBrand {
@@ -246,5 +249,3 @@ export interface SupabaseAddress {
   phone?: string | null; // text
   is_default: boolean; // boolean, default false
 }
-
-    

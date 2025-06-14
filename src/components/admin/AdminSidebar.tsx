@@ -4,13 +4,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingBag, BarChart2, Users, Settings, LogOut, Shield } from 'lucide-react';
+import { Home, ShoppingBag, BarChart2, Users, Settings, LogOut, Shield, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: Home },
   { href: '/admin/products', label: 'Products', icon: ShoppingBag },
+  { href: '/admin/categories', label: 'Categories', icon: ListChecks },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/users', label: 'Users', icon: Users }, // Placeholder
   { href: '/admin/settings', label: 'Settings', icon: Settings }, // Placeholder

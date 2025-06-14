@@ -2,12 +2,12 @@
 // src/app/admin/products/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { Product, ProductCategory, AppSection } from '@/types';
+import type { Product, SupabaseCategory as AdminUICategoryType } from '@/types'; // Changed ProductCategory to SupabaseCategory
 import { ProductForm, type ProductFormSubmitData } from './components/ProductForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -21,53 +21,40 @@ import {
 } from "@/components/ui/select"
 import { useToast } from '@/hooks/use-toast';
 
-// --- IMPORTANT ---
-// This `allPossibleCategories` array MUST be updated to reflect your actual `categories` table in Supabase.
-// The `id` MUST match the `id` from your database.
-// The `value` is a string identifier used internally by the frontend (must be unique and part of ProductCategory type in src/types/index.ts).
-// The `label` is what users see in the dropdown.
-// The `section` helps group categories visually (must be part of AppSection type in src/types/index.ts).
-//
-// Example: If your DB `categories` table has:
-// { id: 1, name: 'Fresh Meats' }, { id: 2, name: 'Organic Vegetables' }
-// Your array here should be:
-// { id: 1, value: 'meats', label: 'Fresh Meats', section: 'grocery' },
-// { id: 2, value: 'vegetables', label: 'Organic Vegetables', section: 'grocery' },
-// ... and so on for all your categories. Ensure each `value` and `section` is added to `src/types/index.ts`.
-// -----------------
-const allPossibleCategories: { id: number; value: ProductCategory; label: string; section: AppSection }[] = [
-  // Grocery
-  { id: 1, value: 'meats', label: 'Meats', section: 'grocery' },
-  { id: 2, value: 'vegetables', label: 'Vegetables', section: 'grocery' },
-  { id: 3, value: 'fruits', label: 'Fruits', section: 'grocery' },
-  { id: 4, value: 'breads', label: 'Breads', section: 'grocery' },
-  // Cosmetics
-  { id: 5, value: 'skincare', label: 'Skincare', section: 'cosmetics' },
-  { id: 6, value: 'makeup', label: 'Makeup', section: 'cosmetics' },
-  { id: 7, value: 'fragrance', label: 'Fragrance', section: 'cosmetics' },
-  // Fast Food
-  { id: 8, value: 'burgers', label: 'Burgers', section: 'fastfood' },
-  { id: 9, value: 'pizza', label: 'Pizza', section: 'fastfood' },
-  { id: 10, value: 'sides', label: 'Sides', section: 'fastfood' },
-  { id: 11, value: 'drinks', label: 'Drinks', section: 'fastfood' },
-  // Example additional categories (REPLACE THESE WITH YOUR ACTUAL DB DATA)
-  { id: 100, value: 'electronics', label: 'Electronics', section: 'tech' },
-  { id: 101, value: 'clothing', label: 'Clothing', section: 'fashion' },
-  { id: 102, value: 'books', label: 'Books', section: 'literature' },
-];
-
+// Hardcoded allPossibleCategories is removed. Categories will be fetched.
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [allCategories, setAllCategories] = useState<AdminUICategoryType[]>([]); // State for fetched categories
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState<ProductCategory | 'all'>('all');
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('all'); // Store category ID as string
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchProducts = async () => {
+  const fetchProductCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    try {
+      const response = await fetch('/api/categories');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch categories' }));
+        throw new Error(errorData.error);
+      }
+      const data: AdminUICategoryType[] = await response.json();
+      setAllCategories(data);
+    } catch (error) {
+      console.error("Fetch categories error:", error);
+      toast({ title: "Error Fetching Categories", description: (error as Error).message, variant: "destructive" });
+      setAllCategories([]);
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, [toast]);
+  
+  const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
       const response = await fetch('/api/products');
@@ -78,16 +65,13 @@ export default function AdminProductsPage() {
       const data = await response.json();
       
       const formattedProducts: Product[] = data.map((p: any) => {
-        const dbCategoryId = p.category_id?.id; // p.category_id is an object {id, name}
-        const matchedCategory = allPossibleCategories.find(cat => cat.id === dbCategoryId);
-        const frontendCategory = matchedCategory?.value || (p.category_id?.name?.toLowerCase() as ProductCategory || 'all'); 
-
         return {
           id: p.id,
           name: p.name,
           description: p.description,
           price: parseFloat(p.price), 
-          category: frontendCategory,
+          category: p.category_id?.name || 'Uncategorized', // Use category name from join
+          category_id: p.category_id?.id, // Store category_id
           image: p.product_images?.find((img: any) => img.is_primary)?.image_url || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
           'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
         };
@@ -96,15 +80,16 @@ export default function AdminProductsPage() {
     } catch (error) {
       console.error("Fetch products error:", error);
       toast({ title: "Error Fetching Products", description: (error as Error).message, variant: "destructive" });
-      setProducts([]); // Set to empty array on error
+      setProducts([]);
     } finally {
       setIsLoadingProducts(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
+    fetchProductCategories();
     fetchProducts();
-  }, []);
+  }, [fetchProductCategories, fetchProducts]);
 
 
   const handleAddProduct = () => {
@@ -114,7 +99,6 @@ export default function AdminProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    toast({ title: "Editing Product", description: "The form is pre-filled. Implement the PUT API at /api/products/[id] to save changes."});
     setIsFormOpen(true);
   };
 
@@ -156,14 +140,13 @@ export default function AdminProductsPage() {
     const formData = new FormData();
     formData.append('name', data.name);
     formData.append('description', data.description);
-    formData.append('price', data.price); 
-    // formData.append('stock', data.stock || '0'); // Example if stock management is added
-
-    const categoryDetails = allPossibleCategories.find(c => c.value === data.category);
-    if (categoryDetails) {
-      formData.append('category_id', categoryDetails.id.toString());
+    formData.append('price', data.price);
+    
+    // data.category_id is now directly the ID from ProductFormSubmitData
+    if (data.category_id) {
+      formData.append('category_id', data.category_id.toString());
     } else {
-      toast({ title: "Category Error", description: `Selected category "${data.category}" is not configured. Please update 'allPossibleCategories'.`, variant: "destructive" });
+      toast({ title: "Category Error", description: "Category ID is missing.", variant: "destructive" });
       setIsSubmitting(false);
       if(loadingToastId) toast.dismiss(loadingToastId);
       return;
@@ -222,16 +205,15 @@ export default function AdminProductsPage() {
     const nameMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const descriptionMatch = product.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSearch = nameMatch || descriptionMatch;
-    const matchesCategory = filterCategory === 'all' || product.category === filterCategory;
+    const matchesCategory = filterCategoryId === 'all' || product.category_id?.toString() === filterCategoryId;
     return matchesSearch && matchesCategory;
   });
   
-  const formSelectableCategories = allPossibleCategories
-    .filter(cat => cat.value !== 'all') 
-    .map(c => ({
-      value: c.value as ProductCategory,
-      label: `${c.label} (${c.section})`
-    }));
+  // Prepare categories for the ProductForm dropdown
+  const formSelectableCategories = allCategories.map(cat => ({
+    value: cat.id, // Use number for value if ProductForm can handle it, otherwise toString()
+    label: cat.name,
+  }));
 
 
   return (
@@ -241,8 +223,8 @@ export default function AdminProductsPage() {
           <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Product Management</h1>
           <p className="text-muted-foreground">Add, edit, or remove products from your store.</p>
         </div>
-        <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting || isLoadingProducts}>
-          {(isLoadingProducts && !products.length && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
+        <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting || isLoadingProducts || isLoadingCategories}>
+          {( (isLoadingProducts || isLoadingCategories) && !products.length && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
           Add New Product
         </Button>
       </header>
@@ -262,24 +244,28 @@ export default function AdminProductsPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
-                disabled={isLoadingProducts && products.length === 0}
+                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
               />
             </div>
-            <Select value={filterCategory} onValueChange={(value) => setFilterCategory(value as ProductCategory | 'all')} disabled={isLoadingProducts && products.length === 0}>
+            <Select 
+                value={filterCategoryId} 
+                onValueChange={(value) => setFilterCategoryId(value)} 
+                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
+            >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {formSelectableCategories.map(cat => (
-                  <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                {allCategories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoadingProducts ? (
+          {isLoadingProducts || isLoadingCategories ? (
              <div className="flex justify-center items-center h-64">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
              </div>
@@ -309,7 +295,7 @@ export default function AdminProductsPage() {
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                     {allPossibleCategories.find(c => c.value === product.category)?.label || product.category}
+                     {product.category} {/* Display category name */}
                   </TableCell>
                   <TableCell>${product.price.toFixed(2)}</TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground truncate max-w-xs">{product.description}</TableCell>
@@ -343,7 +329,7 @@ export default function AdminProductsPage() {
         if (!isOpen) setEditingProduct(null);
       }}>
         <DialogContent className="sm:max-w-2xl p-0">
-          {isFormOpen && (
+          {isFormOpen && ( // Conditionally render to reset form state on open/close
             <ProductForm
               product={editingProduct}
               onSubmit={handleFormSubmit}

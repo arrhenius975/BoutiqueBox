@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Product, ProductCategory } from "@/types";
+import type { Product } from "@/types";
 import { useState, useEffect } from "react";
 import { UploadCloud, X, Loader2 } from "lucide-react";
 import Image from 'next/image';
@@ -19,18 +19,17 @@ export interface ProductFormSubmitData {
   name: string;
   description: string;
   price: string; // Will be parsed to float by backend
-  category: ProductCategory | ''; // String value like 'meats', 'skincare'
+  category_id: number | null; // Changed from category string to category_id number
   imageFile: File | null;
   currentImageUrl?: string; // URL of existing image if editing
  'data-ai-hint'?: string;
-  // stock?: string; // If you manage stock through this form
 }
 
 interface ProductFormProps {
   product?: Product | null; // Product data if editing
   onSubmit: (data: ProductFormSubmitData) => void;
   onCancel: () => void;
-  availableCategories: { value: ProductCategory | 'all'; label: string }[]; 
+  availableCategories: { value: number; label: string }[]; 
   isSubmitting?: boolean;
 }
 
@@ -39,7 +38,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [category, setCategory] = useState<ProductCategory | ''>('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(''); // Store as string for Select component
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dataAiHint, setDataAiHint] = useState<string>('');
@@ -49,15 +48,15 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       setName(product.name);
       setDescription(product.description);
       setPrice(product.price.toString());
-      setCategory(product.category);
-      setImagePreview(product.image); // Show existing image
+      setSelectedCategoryId(product.category_id ? product.category_id.toString() : ''); // Use product.category_id
+      setImagePreview(product.image); 
       setDataAiHint(product['data-ai-hint'] || product.name.toLowerCase().split(' ')[0] || 'product');
     } else {
       // Reset form for new product
       setName('');
       setDescription('');
       setPrice('');
-      setCategory('');
+      setSelectedCategoryId('');
       setImageFile(null);
       setImagePreview(null);
       setDataAiHint('');
@@ -69,7 +68,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       const file = e.target.files[0];
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
         toast({ title: "Image Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
-        e.target.value = ""; // Clear the input
+        e.target.value = ""; 
         return;
       }
       setImageFile(file);
@@ -83,7 +82,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
 
   const handleFormSubmitInternal = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!category) {
+    if (!selectedCategoryId) {
         toast({ title: "Category Required", description: "Please select a category for the product.", variant: "destructive" });
         return;
     }
@@ -105,18 +104,18 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       name,
       description,
       price,
-      category: category as ProductCategory, // Ensure category is not empty string
+      category_id: parseInt(selectedCategoryId, 10), // Convert string ID back to number
       imageFile,
-      currentImageUrl: product?.image, // Pass current image URL for updates
+      currentImageUrl: product?.image,
       'data-ai-hint': dataAiHint || name.toLowerCase().split(' ')[0] || 'product',
     });
   };
   
-  const isFormValid = name.trim() && price.trim() && parseFloat(price) > 0 && category && (product?.id || imageFile);
+  const isFormValid = name.trim() && price.trim() && parseFloat(price) > 0 && selectedCategoryId && (product?.id || imageFile);
 
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
+    <Card className="w-full max-w-2xl mx-auto border-0 shadow-none">
       <CardHeader>
         <CardTitle>{product ? 'Edit Product' : 'Add New Product'}</CardTitle>
         <CardDescription>
@@ -141,17 +140,17 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
             <div className="space-y-2">
               <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
               <Select 
-                value={category} 
-                onValueChange={(value) => setCategory(value as ProductCategory)} 
-                disabled={isSubmitting}
+                value={selectedCategoryId} 
+                onValueChange={(value) => setSelectedCategoryId(value)}
+                disabled={isSubmitting || availableCategories.length === 0}
                 required
               >
                 <SelectTrigger id="category">
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={availableCategories.length === 0 ? "Loading categories..." : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableCategories.filter(cat => cat.value !== 'all').map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  {availableCategories.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value.toString()}>{cat.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
