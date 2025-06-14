@@ -32,6 +32,9 @@ export default function SignUpPage() {
     const success = await signUpWithEmail(name, email, password);
     setIsSubmitting(false);
     if (success) {
+      // User will get a toast "Sign Up Successful! Please check your email to verify your account."
+      // After email verification, they can sign in.
+      // Redirecting to sign-in page is appropriate.
       router.push('/signin');
     }
   };
