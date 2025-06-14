@@ -11,38 +11,48 @@ import { UserPlus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/AppContext';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signUpWithEmail, isLoadingAuth, authUser, userProfile } = useAppContext(); // Added userProfile
+  const { signUpWithEmail, isLoadingAuth, authUser, userProfile } = useAppContext();
   const router = useRouter();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signUpWithEmail(name, email, password);
-    // After sign-up, Supabase typically requires email verification.
-    // The user will be in an "unverified" state until they click the link in their email.
-    // Redirecting to sign-in or a "please verify" page is common.
-    // For now, AppContext's onAuthStateChange will handle future redirects once verified and profile loaded.
+    if (password.length < 6) {
+        toast({ title: "Password Too Short", description: "Password must be at least 6 characters.", variant: "destructive"});
+        return;
+    }
+    setIsSubmitting(true);
+    const success = await signUpWithEmail(name, email, password);
+    setIsSubmitting(false);
+    if (success) {
+      // User will get a verification email. Redirect to sign-in or a "please verify" page.
+      // For now, redirect to sign-in page. AppContext onAuthStateChange will handle full login after verification.
+      router.push('/auth/signin');
+    }
   };
 
-  // Redirect if user is already logged in
   useEffect(() => {
     if (!isLoadingAuth && authUser) {
-      // Wait for userProfile to be potentially loaded by onAuthStateChange
-      if (userProfile) {
+      if (userProfile) { // Profile loaded, can redirect
         if (userProfile.role === 'admin') {
           router.push('/admin/dashboard');
         } else {
-          router.push('/account'); // Default redirect for non-admin logged-in users
+          router.push('/account'); 
         }
-      } // else: authUser exists, profile not yet loaded, wait for next effect run.
+      }
+      // If authUser exists but userProfile is not yet loaded, wait for profile. Loader below handles this.
     }
   }, [authUser, userProfile, isLoadingAuth, router]);
 
-  if (isLoadingAuth && !authUser) {
+  // Show main loader if auth state is initially loading and no user is yet detected
+  if (isLoadingAuth && !authUser && !userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -50,12 +60,13 @@ export default function SignUpPage() {
     );
   }
   
-  // If already logged in and trying to access sign-up, show loader while redirecting
-  if (authUser && !isLoadingAuth) { // Check !isLoadingAuth to ensure auth state is settled
+  // If already logged in (authUser exists and auth not loading)
+  // and trying to access sign-up, show loader while redirecting.
+  if (authUser && !isLoadingAuth) {
      return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-2">Redirecting...</p>
+        <p className="ml-2">{userProfile ? 'Redirecting...' : 'Loading profile & redirecting...'}</p>
       </div>
     );
   }
@@ -78,7 +89,7 @@ export default function SignUpPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              disabled={isLoadingAuth}
+              disabled={isSubmitting || isLoadingAuth}
             />
           </div>
           <div className="space-y-1.5">
@@ -90,7 +101,7 @@ export default function SignUpPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={isLoadingAuth}
+              disabled={isSubmitting || isLoadingAuth}
             />
           </div>
           <div className="space-y-1.5">
@@ -102,14 +113,14 @@ export default function SignUpPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={isLoadingAuth}
+              disabled={isSubmitting || isLoadingAuth}
               minLength={6}
             />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full" size="lg" disabled={isLoadingAuth}>
-            {isLoadingAuth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
+          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting || isLoadingAuth}>
+            {(isSubmitting || isLoadingAuth) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
             Sign Up
           </Button>
           <p className="text-sm text-muted-foreground">
@@ -123,4 +134,3 @@ export default function SignUpPage() {
     </Card>
   );
 }
-    

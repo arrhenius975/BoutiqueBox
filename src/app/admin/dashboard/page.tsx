@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useEffect, useState } from "react"; // For potential future API calls
 
-const salesData = [
+// Mock data for initial display
+const initialSalesData = [
   { name: 'Jan', sales: 4000, revenue: 2400 },
   { name: 'Feb', sales: 3000, revenue: 1398 },
   { name: 'Mar', sales: 2000, revenue: 9800 },
@@ -16,7 +18,7 @@ const salesData = [
   { name: 'Jun', sales: 2390, revenue: 3800 },
 ];
 
-const userActivityData = [
+const initialUserActivityData = [
   { date: '2024-01-01', visits: 200, signups: 20 },
   { date: '2024-01-08', visits: 250, signups: 25 },
   { date: '2024-01-15', visits: 180, signups: 15 },
@@ -25,11 +27,37 @@ const userActivityData = [
 ];
 
 export default function AdminDashboardPage() {
-  // IMPORTANT: In a real application, this data would be fetched from a backend API.
-  const totalRevenue = 1250350.75;
-  const totalOrders = 15023;
-  const activeUsers = 2500;
-  const conversionRate = 2.5; // Percentage
+  // TODO: Replace with state and fetch real data from GET /api/admin/analytics
+  const [salesData, setSalesData] = useState(initialSalesData);
+  const [userActivityData, setUserActivityData] = useState(initialUserActivityData);
+  const [stats, setStats] = useState({
+    totalRevenue: 1250350.75,
+    totalOrders: 15023,
+    activeUsers: 2500,
+    conversionRate: 2.5, // Percentage
+  });
+
+  // useEffect(() => {
+  //   const fetchAnalytics = async () => {
+  //     try {
+  //       const response = await fetch('/api/admin/analytics');
+  //       if (!response.ok) throw new Error('Failed to fetch analytics');
+  //       const data = await response.json();
+  //       // Assuming data structure: { revenue: [], inventory: [], signups: [] }
+  //       // You'll need to transform this data to fit your chart and stats components.
+  //       // For example:
+  //       // setSalesData(transformRevenueData(data.revenue));
+  //       // setUserActivityData(transformSignupsData(data.signups));
+  //       // setStats(calculateOverallStats(data));
+  //       console.log("Fetched analytics data (TODO: implement data transformation):", data);
+  //     } catch (error) {
+  //       console.error("Error fetching admin analytics:", error);
+  //       // Optionally show a toast message
+  //     }
+  //   };
+  //   // fetchAnalytics(); // Uncomment when API is ready
+  // }, []);
+
 
   const chartConfig = {
     sales: { label: "Sales", color: "hsl(var(--chart-1))" },
@@ -46,7 +74,6 @@ export default function AdminDashboardPage() {
         <p className="text-muted-foreground">Overview of your e-commerce operations.</p>
       </header>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -54,8 +81,8 @@ export default function AdminDashboardPage() {
             <DollarSign className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-            <p className="text-xs text-muted-foreground">+10.2% from last month</p>
+            <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+            <p className="text-xs text-muted-foreground">+10.2% from last month (mock data)</p>
           </CardContent>
         </Card>
         <Card>
@@ -64,8 +91,8 @@ export default function AdminDashboardPage() {
             <ShoppingCart className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalOrders.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+5.1% from last month</p>
+            <div className="text-2xl font-bold">{stats.totalOrders.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">+5.1% from last month (mock data)</p>
           </CardContent>
         </Card>
         <Card>
@@ -74,8 +101,8 @@ export default function AdminDashboardPage() {
             <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{activeUsers.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+201 since last hour</p>
+            <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">+201 since last hour (mock data)</p>
           </CardContent>
         </Card>
         <Card>
@@ -84,18 +111,17 @@ export default function AdminDashboardPage() {
             <Activity className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{conversionRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">+1.5% from last week</p>
+            <div className="text-2xl font-bold">{stats.conversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">+1.5% from last week (mock data)</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Sales & Revenue Overview</CardTitle>
-            <CardDescription>Monthly sales and revenue figures.</CardDescription>
+            <CardDescription>Monthly sales and revenue figures. (Currently mock data)</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -117,7 +143,7 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>User Activity</CardTitle>
-            <CardDescription>Weekly site visits and new signups.</CardDescription>
+            <CardDescription>Weekly site visits and new signups. (Currently mock data)</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
@@ -137,7 +163,7 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
       <p className="text-sm text-muted-foreground text-center">
-        Note: All data displayed is for demonstration purposes only.
+        Note: All data displayed is for demonstration purposes. Implement `GET /api/admin/analytics` and related Supabase views/functions for real data.
       </p>
     </div>
   );

@@ -78,8 +78,8 @@ interface AppContextType {
   authUser: AuthUser | null;
   userProfile: SupabaseUser | null;
   isLoadingAuth: boolean;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<boolean>;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   setUserProfile: React.Dispatch<React.SetStateAction<SupabaseUser | null>>;
 
@@ -172,7 +172,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       mediaQuery.addEventListener('change', applyCurrentTheme);
       return () => mediaQuery.removeEventListener('change', applyCurrentTheme);
     } else {
-      // Cleanup listener if theme is not system
       mediaQuery.removeEventListener('change', applyCurrentTheme);
     }
   }, [theme]);
@@ -215,50 +214,52 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setViewedProducts([]);
         setRecommendations([]);
         setSelectedCategory('all');
-        // Reset search term only if navigating to a non-feature page like landing ('/') or account/settings
         if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin')) {
            if (searchTerm) setSearchTerm('');
            if (searchFilterType !== 'all') setSearchFilterType('all');
         }
       }
     }
-  }, [pathname, currentSection, searchTerm, searchFilterType]); // Added searchFilterType
+  }, [pathname, currentSection, searchTerm, searchFilterType]);
 
-  // Auth state change listener
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    const { data: profileData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', userId)
+      .single();
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      toast({ title: "Profile Error", description: "Could not load your profile details.", variant: "destructive" });
+      setUserProfile(null); // Explicitly set to null on error
+    } else {
+      setUserProfile(profileData as SupabaseUser);
+    }
+    return profileData; // Return fetched profile data or null
+  }, [toast, setUserProfile]); // Added setUserProfile to dependencies
+
   useEffect(() => {
-    const fetchUserProfile = async (userId: string) => {
-      const { data: profileData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', userId)
-        .single();
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        toast({ title: "Profile Error", description: "Could not load your profile details.", variant: "destructive" });
-        setUserProfile(null);
-      } else {
-        setUserProfile(profileData as SupabaseUser);
-      }
-    };
-
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       setIsLoadingAuth(true);
-      setAuthUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchUserProfile(session.user.id);
+      const currentAuthUser = session?.user ?? null;
+      setAuthUser(currentAuthUser);
+
+      if (currentAuthUser) {
+        await fetchUserProfile(currentAuthUser.id);
       } else {
         setUserProfile(null);
       }
       setIsLoadingAuth(false);
     });
     
-    // Initial session check
     const getInitialSession = async () => {
         setIsLoadingAuth(true);
         const { data: { session } } = await supabase.auth.getSession();
-        setAuthUser(session?.user ?? null);
-        if (session?.user) {
-            await fetchUserProfile(session.user.id);
+        const initialAuthUser = session?.user ?? null;
+        setAuthUser(initialAuthUser);
+
+        if (initialAuthUser) {
+            await fetchUserProfile(initialAuthUser.id);
         } else {
             setUserProfile(null);
         }
@@ -266,27 +267,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
     getInitialSession();
 
-
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [toast, setUserProfile]);
+  }, [fetchUserProfile]); // fetchUserProfile is now stable
 
-  const signInWithEmail = async (email: string, password: string) => {
+  const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
     setIsLoadingAuth(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setIsLoadingAuth(false); // Set loading to false regardless of outcome
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    
     if (error) {
       toast({ title: "Sign In Failed", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Signed In Successfully!"});
-      // Profile will be fetched by onAuthStateChange
-      // Wait for profile to be potentially set by onAuthStateChange before redirecting
-      // This might need a small delay or a check if profile is loaded for role-based redirect
+      setIsLoadingAuth(false);
+      return false;
     }
+    if (data.user) {
+      // Auth state change will trigger profile fetch.
+      // We don't need to set isLoadingAuth(false) here as onAuthStateChange will handle it.
+      toast({ title: "Signed In Successfully!"});
+      return true;
+    }
+    setIsLoadingAuth(false); // Fallback
+    return false;
   };
 
-  const signUpWithEmail = async (name: string, email: string, password: string) => {
+  const signUpWithEmail = async (name: string, email: string, password: string): Promise<boolean> => {
     setIsLoadingAuth(true);
     const { data, error } = await supabase.auth.signUp({ 
         email, 
@@ -295,31 +300,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             data: { name: name } 
         }
     });
-    setIsLoadingAuth(false);
+    
     if (error) {
       toast({ title: "Sign Up Failed", description: error.message, variant: "destructive" });
-    } else if (data.user) {
-      toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
-      // Profile creation is handled by Supabase trigger 'handle_new_user'.
-      // onAuthStateChange will fetch it.
+      setIsLoadingAuth(false);
+      return false;
     }
+    
+    if (data.user) {
+      // Supabase trigger 'handle_new_user' should create the profile.
+      // onAuthStateChange will fetch it.
+      toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
+       // Don't setIsLoadingAuth(false) here; onAuthStateChange will.
+      return true;
+    }
+    
+    // Fallback if no user data and no error (should not happen with Supabase normally)
+    toast({ title: "Sign Up Incomplete", description: "Something went wrong during sign up.", variant: "destructive"});
+    setIsLoadingAuth(false);
+    return false;
   };
   
   const signOut = async () => {
     setIsLoadingAuth(true);
     const { error } = await supabase.auth.signOut();
-    setIsLoadingAuth(false);
     if (error) {
       toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
     } else {
-      setAuthUser(null);
-      setUserProfile(null);
-      setCart([]);
-      setWishlist([]);
-      setViewedProducts([]);
       toast({ title: "Signed Out"});
+      // State updates (authUser, userProfile) are handled by onAuthStateChange
       router.push('/'); 
     }
+    setIsLoadingAuth(false); // Ensure loading is false after operation
   };
 
 
@@ -335,7 +347,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
     toast({
       title: "Added to Cart",
-      description: `${product.name} has been added.`,
+      description: `${product.name} is now in your cart.`,
     });
   }, [toast]);
 
@@ -343,7 +355,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Cart",
-      variant: "default" // Not destructive, just informational
+      description: `Item removed from your cart.`,
     });
   }, [toast]);
 
@@ -351,7 +363,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.id === productId ? { ...item, quantity } : item
-      ).filter(item => item.quantity > 0) // Remove if quantity becomes 0 or less
+      ).filter(item => item.quantity > 0) 
     );
   }, []);
 
@@ -359,13 +371,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart([]);
     toast({
       title: "Cart Cleared",
+      description: "All items have been removed from your cart.",
     });
   }, [toast]);
 
   const addToWishlist = useCallback((product: Product) => {
     setWishlist((prevWishlist) => {
       if (prevWishlist.find((item) => item.id === product.id)) {
-        // If already wishlisted, remove it (toggle behavior)
         toast({
           title: "Removed from Wishlist",
           description: `${product.name} is no longer in your wishlist.`,
@@ -374,7 +386,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       toast({
         title: "Added to Wishlist",
-        description: `${product.name} has been added.`,
+        description: `${product.name} has been added to your wishlist.`,
       });
       return [...prevWishlist, product];
     });
@@ -384,6 +396,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setWishlist((prevWishlist) => prevWishlist.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Wishlist",
+      description: `Item removed from your wishlist.`,
     });
   }, [toast]);
 
