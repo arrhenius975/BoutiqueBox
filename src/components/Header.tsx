@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn } from 'lucide-react'; // Added User, LogIn
+import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn, Settings as SettingsIcon, HelpCircle, LayoutGrid } from 'lucide-react'; // Added User, LogIn, SettingsIcon, HelpCircle, LayoutGrid
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const desktopNavItems = [
+  { href: '/sections', label: 'Stores', icon: LayoutGrid },
+  { href: '/account', label: 'Account', icon: User },
+  { href: '/help', label: 'Help', icon: HelpCircle },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon },
+];
+
 export function Header() {
   const {
     cart,
@@ -37,8 +44,8 @@ export function Header() {
     setSearchTerm,
     searchFilterType,
     setSearchFilterType,
-    authUser, // Added from context
-    isLoadingAuth, // Added from context
+    authUser,
+    isLoadingAuth,
   } = useAppContext();
   const pathname = usePathname();
 
@@ -86,7 +93,7 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 100; // Increased from 80 to 100 for a wider arc
+  const categoryArcRadius = 100;
   const yOffsetForArc = 5;
   const angleSpan = numCategories > 1 ? 180 : 0;
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
@@ -171,82 +178,112 @@ export function Header() {
           </div>
         )}
 
-        <nav className={cn(
-          "flex items-center gap-1 sm:gap-2 shrink-0",
-           (currentSectionConfig && currentSection) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
+        {/* Desktop Navigation and Action Icons Wrapper */}
+        <div className={cn(
+          "flex items-center gap-x-1 sm:gap-x-2",
+          (currentSectionConfig && currentSection) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
         )}>
-          {currentSection && (
+          {/* Desktop Navigation Links - Hidden on mobile */}
+          <nav className="hidden md:flex items-center gap-x-3 lg:gap-x-4">
+            {desktopNavItems.map((item) => {
+              const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
+              const ItemIcon = item.icon;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={cn(
+                    "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
+                    isActive ? "bg-[hsl(var(--primary)/0.2)] opacity-100" : "opacity-90",
+                    (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
+                  )}
+                  title={item.label}
+                >
+                  <ItemIcon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Separator for desktop */}
+          {desktopNavItems.length > 0 && <div className="hidden md:block h-6 w-px bg-[hsl(var(--border))] mx-2"></div>}
+
+          {/* Action Icons */}
+          <div className="flex items-center gap-x-0.5 sm:gap-x-1">
+            {currentSection && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={fetchRecommendations}
+                aria-label="Get Personalized Recommendations"
+                disabled={isLoadingRecommendations}
+                title="Personalized Recommendations"
+                className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              >
+                <Lightbulb className="h-5 w-5 md:h-6 md:w-6" />
+                {isLoadingRecommendations && <span className="sr-only">Loading...</span>}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              onClick={fetchRecommendations}
-              aria-label="Get Personalized Recommendations"
-              disabled={isLoadingRecommendations}
-              title="Personalized Recommendations"
-              className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              onClick={toggleWishlist}
+              aria-label="Open Wishlist"
+              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              title="Wishlist"
             >
-              <Lightbulb className="h-5 w-5 md:h-6 md:w-6" />
-              {isLoadingRecommendations && <span className="sr-only">Loading...</span>}
+              <Heart className="h-5 w-5 md:h-6 md:w-6" />
+              {wishlistItemCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs">
+                  {wishlistItemCount}
+                </Badge>
+              )}
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleWishlist}
-            aria-label="Open Wishlist"
-            className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-            title="Wishlist"
-          >
-            <Heart className="h-5 w-5 md:h-6 md:w-6" />
-            {wishlistItemCount > 0 && (
-              <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs">
-                {wishlistItemCount}
-              </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleCart}
+              aria-label="Open Shopping Cart"
+              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              title="Shopping Cart"
+            >
+              <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
+              {cartItemCount > 0 && (
+                <Badge className={cn("absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs", (currentSectionConfig && currentSection) ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]" : "bg-accent text-accent-foreground" )}>
+                  {cartItemCount}
+                </Badge>
+              )}
+            </Button>
+            {!isLoadingAuth && (
+              authUser ? (
+                <Link href="/account" passHref>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="My Account"
+                    className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                    title="My Account"
+                  >
+                    <User className="h-5 w-5 md:h-6 md:w-6" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/signin" passHref>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Sign In"
+                    className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                    title="Sign In / Sign Up"
+                  >
+                    <LogIn className="h-5 w-5 md:h-6 md:w-6" />
+                  </Button>
+                </Link>
+              )
             )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleCart}
-            aria-label="Open Shopping Cart"
-            className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-            title="Shopping Cart"
-          >
-            <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
-            {cartItemCount > 0 && (
-              <Badge className={cn("absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs", (currentSectionConfig && currentSection) ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]" : "bg-accent text-accent-foreground" )}>
-                {cartItemCount}
-              </Badge>
-            )}
-          </Button>
-          {!isLoadingAuth && (
-            authUser ? (
-              <Link href="/account" passHref>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="My Account"
-                  className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-                  title="My Account"
-                >
-                  <User className="h-5 w-5 md:h-6 md:w-6" />
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/signin" passHref>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sign In"
-                  className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-                  title="Sign In / Sign Up"
-                >
-                  <LogIn className="h-5 w-5 md:h-6 md:w-6" />
-                </Button>
-              </Link>
-            )
-          )}
-        </nav>
+          </div>
+        </div>
       </div>
 
       {currentSection && categoriesList.length > 0 && (
@@ -257,7 +294,6 @@ export function Header() {
               const radian = angle * (Math.PI / 180);
 
               const x = categoryArcRadius * Math.sin(radian);
-              // Changed y calculation for U-shape arc
               const y = yOffsetForArc + categoryArcRadius * Math.cos(radian);
 
               const iconSizeClass = "w-12 h-12 sm:w-14 sm:h-14";
@@ -296,4 +332,3 @@ export function Header() {
     </header>
   );
 }
-
