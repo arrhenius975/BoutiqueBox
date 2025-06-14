@@ -6,9 +6,9 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon } from 'lucide-react';
-import { Product, ProductCategory, AppSection } from '@/types'; // Assuming these types exist
-import { ProductForm } from './components/ProductForm';
+import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Product, ProductCategory, AppSection } from '@/types';
+import { ProductForm, type ProductFormSubmitData } from './components/ProductForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { supabase } from '@/data/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock Data - In a real app, this would come from your database via an API
 const mockProducts: Product[] = [
@@ -29,16 +31,13 @@ const mockProducts: Product[] = [
 ];
 
 const allPossibleCategories: { value: ProductCategory; label: string; section: AppSection }[] = [
-  // Grocery
   { value: 'meats', label: 'Meats', section: 'grocery' },
   { value: 'vegetables', label: 'Vegetables', section: 'grocery' },
   { value: 'fruits', label: 'Fruits', section: 'grocery' },
   { value: 'breads', label: 'Breads', section: 'grocery' },
-  // Cosmetics
   { value: 'skincare', label: 'Skincare', section: 'cosmetics' },
   { value: 'makeup', label: 'Makeup', section: 'cosmetics' },
   { value: 'fragrance', label: 'Fragrance', section: 'cosmetics' },
-  // Fast Food
   { value: 'burgers', label: 'Burgers', section: 'fastfood' },
   { value: 'pizza', label: 'Pizza', section: 'fastfood' },
   { value: 'sides', label: 'Sides', section: 'fastfood' },
@@ -52,6 +51,8 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<ProductCategory | 'all'>('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const handleAddProduct = () => {
     setEditingProduct(null);
@@ -64,43 +65,73 @@ export default function AdminProductsPage() {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    // UI Only: In a real app, this would be an API call
-    if (window.confirm("Are you sure you want to delete this product?")) {
+    if (window.confirm("Are you sure you want to delete this product? This is a UI demo.")) {
       setProducts(products.filter(p => p.id !== productId));
-      console.log(`UI: Deleted product ${productId}`);
+      toast({ title: "Product Deleted (UI Demo)", description: `Product ${productId} removed from list.` });
+      // In real app: await supabase.from('products').delete().eq('id', productId);
+      // And delete associated images from storage.
     }
   };
 
-  const handleFormSubmit = (formData: FormData) => {
-    // UI Only: In a real app, this would be an API call to create/update product
-    // For FormData, you'd typically send it to a backend endpoint.
-    const newProductData: Partial<Product> = {
-        name: formData.get('name') as string,
-        description: formData.get('description') as string,
-        price: parseFloat(formData.get('price') as string),
-        category: formData.get('category') as ProductCategory,
-        // Image handling would be more complex, involving upload and URL storage
-    };
-    const imageFile = formData.get('image') as File | null;
+  const handleFormSubmit = async (data: ProductFormSubmitData) => {
+    setIsSubmitting(true);
+    let imageUrl = data.currentImageUrl || 'https://placehold.co/100x100.png';
+    const productId = data.id || `prod-${Date.now()}`; // Use existing ID or generate one for path
 
-    if (editingProduct) {
-      const updatedProduct = { 
-        ...editingProduct, 
-        ...newProductData,
-        image: imageFile ? URL.createObjectURL(imageFile) : editingProduct.image // Basic preview update
-      };
-      setProducts(products.map(p => (p.id === editingProduct.id ? updatedProduct : p)));
-      console.log("UI: Updated product", updatedProduct);
-    } else {
-      const newProductEntry: Product = {
-        id: `prod-${Date.now()}`, // Simple unique ID for demo
-        ...newProductData as Omit<Product, 'id' | 'image' | 'data-ai-hint'>,
-        image: imageFile ? URL.createObjectURL(imageFile) : 'https://placehold.co/100x100.png', // Basic preview
-        'data-ai-hint': (formData.get('name') as string).toLowerCase().split(' ')[0] || 'product',
-      };
-      setProducts([newProductEntry, ...products]);
-      console.log("UI: Added new product", newProductEntry);
+    if (data.imageFile) {
+      const file = data.imageFile;
+      // Sanitize filename, replace spaces with underscores, and ensure it's relatively safe
+      const safeFileName = file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, '');
+      const filePath = `${productId}/${safeFileName}`; 
+      
+      const loadingToast = toast({ title: "Uploading image...", description: "Please wait.", duration: Infinity });
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+      
+      loadingToast.dismiss();
+
+      if (uploadError) {
+        console.error('Storage Upload Error:', uploadError);
+        toast({ title: 'Image Upload Failed', description: uploadError.message, variant: 'destructive' });
+        setIsSubmitting(false);
+        return; // Stop if image upload fails
+      } else if (uploadData) {
+        const { data: urlData } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(uploadData.path);
+        imageUrl = urlData.publicUrl;
+        toast({ title: 'Image Uploaded Successfully!', description: `Image available at new URL.` });
+      }
     }
+
+    const productData: Product = {
+      id: productId,
+      name: data.name,
+      description: data.description,
+      price: parseFloat(data.price),
+      category: data.category,
+      image: imageUrl,
+      'data-ai-hint': data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product',
+    };
+
+    if (data.id) { // Editing existing product
+      setProducts(products.map(p => (p.id === data.id ? productData : p)));
+      toast({ title: "Product Updated (UI Demo)", description: `${productData.name} has been updated.` });
+      // In real app: await supabase.from('products').update({ ...productData }).eq('id', data.id);
+      // And update product_images table if primary image URL changed.
+    } else { // Adding new product
+      setProducts([productData, ...products]);
+      toast({ title: "Product Added (UI Demo)", description: `${productData.name} has been added.` });
+      // In real app: await supabase.from('products').insert({ ...productData });
+      // And insert into product_images table.
+    }
+
+    setIsSubmitting(false);
     setIsFormOpen(false);
     setEditingProduct(null);
   };
@@ -119,7 +150,7 @@ export default function AdminProductsPage() {
           <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Product Management</h1>
           <p className="text-muted-foreground">Add, edit, or remove products from your store.</p>
         </div>
-        <Button onClick={handleAddProduct} size="lg">
+        <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting}>
           <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
         </Button>
       </header>
@@ -171,7 +202,7 @@ export default function AdminProductsPage() {
                 <TableRow key={product.id}>
                   <TableCell>
                     {product.image ? (
-                       <Image src={product.image} alt={product.name} width={48} height={48} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint']}/>
+                       <Image src={product.image} alt={product.name} width={48} height={48} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint'] || 'product'}/>
                     ) : (
                       <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center">
                         <ImageIcon className="h-6 w-6 text-muted-foreground"/>
@@ -186,10 +217,10 @@ export default function AdminProductsPage() {
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground truncate max-w-xs">{product.description}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="icon" onClick={() => handleEditProduct(product)} title="Edit">
+                      <Button variant="outline" size="icon" onClick={() => handleEditProduct(product)} title="Edit" disabled={isSubmitting}>
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      <Button variant="destructive" size="icon" onClick={() => handleDeleteProduct(product.id)} title="Delete">
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteProduct(product.id)} title="Delete" disabled={isSubmitting}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -208,23 +239,24 @@ export default function AdminProductsPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+        if (isSubmitting) return; // Prevent closing while submitting
         setIsFormOpen(isOpen);
         if (!isOpen) setEditingProduct(null);
       }}>
         <DialogContent className="sm:max-w-2xl p-0">
-          {/* ProductForm is rendered inside DialogContent to ensure it mounts when dialog opens */}
           {isFormOpen && (
             <ProductForm
               product={editingProduct}
               onSubmit={handleFormSubmit}
               onCancel={() => { setIsFormOpen(false); setEditingProduct(null); }}
               availableCategories={allPossibleCategories.map(c => ({value: c.value, label: `${c.label} (${c.section})`}))}
+              isSubmitting={isSubmitting}
             />
           )}
         </DialogContent>
       </Dialog>
       <p className="text-sm text-muted-foreground text-center">
-        Note: Product creation, update, and deletion are UI demonstrations. Backend integration is required for persistence.
+        Product management interactions are UI demonstrations. Full CRUD operations and image persistence require backend and database integration with Supabase.
       </p>
     </div>
   );

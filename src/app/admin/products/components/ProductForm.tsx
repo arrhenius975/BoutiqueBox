@@ -8,25 +8,38 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Product, ProductCategory } from "@/types"; // Assuming ProductCategory is defined
+import { Product, ProductCategory } from "@/types";
 import { useState, useEffect } from "react";
 import { UploadCloud, X } from "lucide-react";
 import Image from 'next/image';
 
-interface ProductFormProps {
-  product?: Product | null; // Product data for editing, null for new product
-  onSubmit: (formData: FormData) => void; // Using FormData for file upload
-  onCancel: () => void;
-  availableCategories: { value: ProductCategory; label: string }[]; // Pass available categories
+export interface ProductFormSubmitData {
+  name: string;
+  description: string;
+  price: string;
+  category: ProductCategory;
+  imageFile: File | null;
+  id?: string; // For editing
+  currentImageUrl?: string;
+ 'data-ai-hint'?: string;
 }
 
-export function ProductForm({ product, onSubmit, onCancel, availableCategories }: ProductFormProps) {
+interface ProductFormProps {
+  product?: Product | null;
+  onSubmit: (data: ProductFormSubmitData) => void;
+  onCancel: () => void;
+  availableCategories: { value: ProductCategory; label: string }[];
+  isSubmitting?: boolean;
+}
+
+export function ProductForm({ product, onSubmit, onCancel, availableCategories, isSubmitting }: ProductFormProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState<ProductCategory | ''>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [dataAiHint, setDataAiHint] = useState<string>('');
 
   useEffect(() => {
     if (product) {
@@ -34,7 +47,8 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
       setDescription(product.description);
       setPrice(product.price.toString());
       setCategory(product.category);
-      setImagePreview(product.image); // Display existing image
+      setImagePreview(product.image);
+      setDataAiHint(product['data-ai-hint'] || product.name.toLowerCase().split(' ')[0] || 'product');
     } else {
       setName('');
       setDescription('');
@@ -42,6 +56,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
       setCategory('');
       setImageFile(null);
       setImagePreview(null);
+      setDataAiHint('');
     }
   }, [product]);
 
@@ -53,21 +68,18 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleFormSubmitInternal = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('description', description);
-    formData.append('price', price);
-    formData.append('category', category);
-    if (imageFile) {
-      formData.append('image', imageFile);
-    }
-    // If updating and no new image is selected, backend should keep old image
-    // This client-side form doesn't send the old image URL directly for security/simplicity
-    // Backend needs to handle "no image file means keep existing" for updates.
-    
-    onSubmit(formData);
+    onSubmit({
+      id: product?.id,
+      name,
+      description,
+      price,
+      category: category as ProductCategory, // Already validated by `required` on Select
+      imageFile,
+      currentImageUrl: product?.image,
+      'data-ai-hint': dataAiHint || name.toLowerCase().split(' ')[0] || 'product',
+    });
   };
 
   return (
@@ -78,24 +90,24 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
           {product ? 'Update the details of the existing product.' : 'Fill in the details for the new product.'}
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleFormSubmitInternal}>
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="name">Product Name</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSubmitting} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
-            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required disabled={isSubmitting} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="price">Price ($)</Label>
-              <Input id="price" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required />
+              <Input id="price" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required disabled={isSubmitting} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <Select value={category} onValueChange={(value) => setCategory(value as ProductCategory)} required>
+              <Select value={category} onValueChange={(value) => setCategory(value as ProductCategory)} required disabled={isSubmitting}>
                 <SelectTrigger id="category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -106,6 +118,10 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
                 </SelectContent>
               </Select>
             </div>
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="dataAiHint">AI Image Hint (1-2 words)</Label>
+            <Input id="dataAiHint" value={dataAiHint} onChange={(e) => setDataAiHint(e.target.value)} placeholder="e.g. red apple" disabled={isSubmitting}/>
           </div>
           <div className="space-y-2">
             <Label htmlFor="image">Product Image</Label>
@@ -119,7 +135,8 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
                         variant="destructive"
                         size="icon"
                         className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
-                        onClick={() => { setImageFile(null); setImagePreview(null); if(product) product.image = '';}}
+                        onClick={() => { setImageFile(null); setImagePreview(product?.image || null); }} // Revert to original or null
+                        disabled={isSubmitting}
                       >
                         <X className="h-4 w-4"/>
                       </Button>
@@ -130,10 +147,10 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
                 <div className="flex text-sm text-muted-foreground justify-center">
                   <label
                     htmlFor="image-upload"
-                    className="relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
+                    className={`relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary ${isSubmitting ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <span>Upload a file</span>
-                    <Input id="image-upload" name="image" type="file" className="sr-only" onChange={handleImageChange} accept="image/*" />
+                    <Input id="image-upload" name="image" type="file" className="sr-only" onChange={handleImageChange} accept="image/*" disabled={isSubmitting} />
                   </label>
                   <p className="pl-1">or drag and drop</p>
                 </div>
@@ -141,13 +158,15 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories }
               </div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Important: Image upload functionality requires backend implementation. This is a UI placeholder.
+              Image upload uses Supabase Storage. Ensure bucket 'product-images' and policies are set up.
             </p>
           </div>
         </CardContent>
         <CardFooter className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button type="submit">{product ? 'Update Product' : 'Add Product'}</Button>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>Cancel</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Submitting...' : (product ? 'Update Product' : 'Add Product')}
+          </Button>
         </CardFooter>
       </form>
     </Card>

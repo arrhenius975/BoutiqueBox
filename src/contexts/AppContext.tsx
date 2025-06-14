@@ -82,7 +82,7 @@ interface AppContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-
+  setUserProfile: React.Dispatch<React.SetStateAction<SupabaseUser | null>>; // To allow local updates like avatar preview
 
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
@@ -124,8 +124,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system');
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [userProfile, setUserProfile] = useState<SupabaseUser | null>(null);
+  const [userProfile, setUserProfileState] = useState<SupabaseUser | null>(null); // Renamed to avoid conflict
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // Wrapper for setUserProfile to make it available in context
+  const setUserProfile = useCallback((profile: SupabaseUser | null | ((prevState: SupabaseUser | null) => SupabaseUser | null)) => {
+    setUserProfileState(profile);
+  }, []);
 
 
   const { toast } = useToast();
@@ -227,15 +232,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
             setAuthUser(session.user);
-            const { data: profile, error } = await supabase
+            const { data: profileData, error } = await supabase
                 .from('users')
-                .select('*')
+                .select('*') // Selects all columns including name, role, avatar_url if they exist
                 .eq('auth_id', session.user.id)
                 .single();
             if (error) {
-                console.error('Error fetching user profile:', error);
+                console.error('Error fetching user profile on initial load:', error);
             } else {
-                setUserProfile(profile as SupabaseUser);
+                setUserProfile(profileData as SupabaseUser);
             }
         }
         setIsLoadingAuth(false);
@@ -246,16 +251,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(true);
       setAuthUser(session?.user ?? null);
       if (session?.user) {
-        const { data: profile, error } = await supabase
+        const { data: profileData, error } = await supabase
           .from('users')
-          .select('*')
+          .select('*') // Selects all columns
           .eq('auth_id', session.user.id)
           .single();
         if (error) {
           toast({ title: "Error fetching profile", description: error.message, variant: "destructive" });
           setUserProfile(null);
         } else {
-          setUserProfile(profile as SupabaseUser);
+          setUserProfile(profileData as SupabaseUser);
         }
       } else {
         setUserProfile(null);
@@ -266,7 +271,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [toast]);
+  }, [toast, setUserProfile]); // Added setUserProfile to dependency array
 
   const signInWithEmail = async (email: string, password: string) => {
     setIsLoadingAuth(true);
@@ -277,7 +282,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Signed In Successfully!"});
       // Profile will be fetched by onAuthStateChange
     }
-    setIsLoadingAuth(false);
+    setIsLoadingAuth(false); // Moved inside, ensures it's set regardless of error
   };
 
   const signUpWithEmail = async (name: string, email: string, password: string) => {
@@ -286,29 +291,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         email, 
         password,
         options: {
-            data: { name: name } // This name is for auth.users.user_metadata, trigger handles users table
+            data: { name: name } 
         }
     });
 
     if (error) {
       toast({ title: "Sign Up Failed", description: error.message, variant: "destructive" });
     } else if (data.user) {
-      // The trigger 'handle_new_user' should create a row in public.users.
-      // We can then update it with the name if needed, although the trigger might be enough if it also handles name.
-      // For now, we assume the trigger handles email, and the user can update their name on their profile page.
-      // If your handle_new_user trigger doesn't include name, you'd do an update here.
-      // Example if name needs to be updated on public.users after signup and trigger:
-      // const { error: updateError } = await supabase
-      //   .from('users')
-      //   .update({ name: name })
-      //   .eq('auth_id', data.user.id);
-      // if (updateError) {
-      //    toast({ title: "Profile Update Failed", description: updateError.message, variant: "destructive" });
-      // }
-
+      // Trigger 'handle_new_user' should create a row in public.users.
+      // If your trigger also copies 'name' from raw_user_meta_data, it will be set.
+      // Otherwise, 'name' in public.users might be null initially.
       toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
     }
-    setIsLoadingAuth(false);
+    setIsLoadingAuth(false); // Moved inside
   };
   
   const signOut = async () => {
@@ -318,11 +313,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
     } else {
       setAuthUser(null);
-      setUserProfile(null);
+      setUserProfile(null); // Clear local profile state
       toast({ title: "Signed Out"});
-      router.push('/'); // Redirect to home after sign out
+      router.push('/'); 
     }
-    setIsLoadingAuth(false);
+    setIsLoadingAuth(false); // Moved inside
   };
 
 
@@ -370,10 +365,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const addToWishlist = useCallback((product: Product) => {
     setWishlist((prevWishlist) => {
       if (prevWishlist.find((item) => item.id === product.id)) {
-        toast({
-          title: "Already in Wishlist",
-          description: `${product.name} is already in your wishlist.`,
-        });
+        // Do not add if already exists, but also don't show a toast here as it's handled in ProductCard/Page
         return prevWishlist;
       }
       toast({
@@ -397,7 +389,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setViewedProducts((prev) => {
       if (prev.includes(productId)) return prev;
       const newViewed = [...prev, productId];
-      return newViewed.slice(-10);
+      return newViewed.slice(-10); // Keep last 10 viewed
     });
   }, []);
 
@@ -468,11 +460,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         theme,
         setTheme,
         authUser,
-        userProfile,
+        userProfile: userProfile, // Use the state variable userProfile
         isLoadingAuth,
         signInWithEmail,
         signUpWithEmail,
         signOut,
+        setUserProfile, // Expose the setter
         addToCart,
         removeFromCart,
         updateCartQuantity,
@@ -499,5 +492,3 @@ export const useAppContext = () => {
   }
   return context;
 };
-
-    
