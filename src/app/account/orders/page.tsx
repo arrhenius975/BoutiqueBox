@@ -22,8 +22,8 @@ const getStatusBadgeVariant = (status: DisplayOrder['status']) => {
     case 'Shipped': return 'secondary';
     case 'Processing': return 'outline';
     case 'Cancelled': return 'destructive';
-    case 'pending': return 'outline';
-    case 'paid': return 'default';
+    case 'pending': return 'outline'; // explicitly handle pending
+    case 'paid': return 'default'; // if you use 'paid'
     default: return 'outline';
   }
 };
@@ -32,12 +32,14 @@ export default function OrderHistoryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<DisplayOrder[]>([]);
-  const [isFetchingOrders, setIsFetchingOrders] = useState(true);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(false); // Set to false initially
   const [fetchError, setFetchError] = useState<string | null>(null);
   const { authUser, isLoadingAuth } = useAppContext();
 
   const fetchOrders = useCallback(async () => {
-    if (!authUser) { // Should ideally be caught by useEffect, but defensive
+    if (!authUser) { 
+        // This state should ideally be caught by the useEffect that calls fetchOrders,
+        // but this is a defensive check.
         setIsFetchingOrders(false);
         setFetchError("User not authenticated. Please sign in.");
         return;
@@ -47,16 +49,15 @@ export default function OrderHistoryPage() {
     try {
       const response = await fetch('/api/orders');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch orders. Please try again.' }));
-        throw new Error(errorData.error || 'Server error');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error from server.' }));
+        throw new Error(errorData.error || `Server returned status ${response.status}`);
       }
       const data: DisplayOrder[] = await response.json();
       setOrders(data);
     } catch (err: any) {
-      console.error("Fetch orders error:", err);
-      setFetchError(err.message || 'An unexpected error occurred.');
-      // Toast only if the error occurred during an authenticated attempt
-      if (authUser) {
+      console.error("Fetch orders error on client:", err);
+      setFetchError(err.message || 'An unexpected error occurred while fetching orders.');
+      if (authUser) { // Only toast if user was theoretically logged in for the attempt
         toast({
           title: "Error Fetching Orders",
           description: err.message || 'Could not load your order history.',
@@ -69,26 +70,41 @@ export default function OrderHistoryPage() {
   }, [toast, authUser]);
 
   useEffect(() => {
-    if (!isLoadingAuth) {
+    if (!isLoadingAuth) { 
       if (authUser) {
-        fetchOrders();
+        // User is authenticated, and auth loading is complete
+        // Fetch orders if they haven't been fetched or if an error previously occurred
+        // and we want to retry (e.g., if authUser just became available).
+        if (orders.length === 0 && !fetchError) { // Fetch if no orders and no prior error
+             fetchOrders();
+        } else if (fetchError && orders.length === 0) {
+            // If there was a fetch error and still no orders, it implies the error was "not authenticated"
+            // and we are now authenticated, so try fetching.
+            // Or if the error was something else, fetchOrders will clear it and retry.
+            fetchOrders();
+        }
       } else {
-        setOrders([]);
+        // Auth loading complete, but no authenticated user.
+        setOrders([]); 
         setFetchError("Please log in to view your order history.");
-        setIsFetchingOrders(false);
+        setIsFetchingOrders(false); // Ensure this is false if not fetching
       }
     }
-  }, [authUser, isLoadingAuth, fetchOrders]);
+    // If isLoadingAuth is true, the main loader below handles it.
+  }, [authUser, isLoadingAuth, fetchOrders, orders.length, fetchError]);
+
 
   if (isLoadingAuth || (authUser && isFetchingOrders && !fetchError)) {
     return (
       <div className="container mx-auto py-8 px-4 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">{isLoadingAuth ? "Verifying authentication..." : "Loading your orders..."}</p>
+        <p className="text-muted-foreground">
+          {isLoadingAuth ? "Verifying authentication..." : (isFetchingOrders ? "Loading your orders..." : "Please wait...")}
+        </p>
       </div>
     );
   }
-
+  
   if (fetchError) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -102,11 +118,18 @@ export default function OrderHistoryPage() {
         </header>
         <Alert variant={!authUser || fetchError === "Please log in to view your order history." ? "default" : "destructive"} className="max-w-2xl mx-auto">
           <AlertTriangle className="h-5 w-5" />
-          <AlertTitle>{!authUser ? "Access Denied" : "Error Loading Orders"}</AlertTitle>
+          <AlertTitle>{!authUser && fetchError === "Please log in to view your order history." ? "Access Denied" : "Error Loading Orders"}</AlertTitle>
           <AlertDescription>
             {fetchError}
-            {authUser && fetchError !== "Please log in to view your order history." && <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2">Try again</Button>}
-            {!authUser && (
+            {/* Show "Try Again" only if user is authenticated but an error other than "not logged in" occurred */}
+            {authUser && fetchError !== "Please log in to view your order history." && (
+                <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2" disabled={isFetchingOrders}>
+                    {isFetchingOrders ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Try again
+                </Button>
+            )}
+            {/* Show "Sign In" if the error is specifically due to not being logged in */}
+            {fetchError === "Please log in to view your order history." && (
                 <Button asChild variant="link" className="p-0 h-auto ml-2">
                     <Link href={`/signin?redirect=/account/orders`}>Sign In</Link>
                 </Button>
@@ -133,7 +156,20 @@ export default function OrderHistoryPage() {
         </Button>
       </header>
 
-      {orders.length === 0 ? (
+      {!authUser && !isLoadingAuth ? ( // This case should be handled by fetchError block, but as a fallback
+           <Card className="text-center py-12">
+            <CardHeader>
+                <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
+                <CardTitle className="text-2xl">Access Denied</CardTitle>
+                <CardDescription>Please log in to view your order history.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button asChild size="lg">
+                <Link href={`/signin?redirect=/account/orders`}>Sign In</Link>
+                </Button>
+            </CardContent>
+           </Card>
+      ) : orders.length === 0 ? (
         <Card className="text-center py-12">
           <CardHeader>
             <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -153,7 +189,7 @@ export default function OrderHistoryPage() {
               <CardHeader className="bg-muted/50 dark:bg-muted/20 p-4 border-b">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div>
-                        <h2 className="text-lg font-semibold">Order ID: {order.id}</h2>
+                        <h2 className="text-lg font-semibold">Order ID: {order.id.substring(0, 8)}...</h2>
                         <p className="text-sm text-muted-foreground">Placed on: {new Date(order.date).toLocaleDateString()}</p>
                     </div>
                     <Badge variant={getStatusBadgeVariant(order.status)} className="text-sm px-3 py-1 capitalize">{order.status}</Badge>
@@ -200,3 +236,4 @@ export default function OrderHistoryPage() {
     </div>
   );
 }
+

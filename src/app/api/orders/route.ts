@@ -7,24 +7,34 @@ import type { DisplayOrder } from '@/types'; // Assuming DisplayOrder includes O
 
 export async function GET(req: NextRequest) {
   try {
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    console.log('API /api/orders: Attempting to get user session.');
+    const { data: { user: authApiUser }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !authUser) {
+    if (authError) {
+      console.error('API /api/orders: Auth error when calling supabase.auth.getUser():', authError.message);
+      return NextResponse.json({ error: `Auth service error: ${authError.message}` }, { status: 500 });
+    }
+
+    if (!authApiUser) {
+      console.log('API /api/orders: No authenticated user found in API route. Session cookies might be missing or invalid.');
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
+    console.log(`API /api/orders: Authenticated user found: ${authApiUser.email} (Auth ID: ${authApiUser.id})`);
+
 
     // Fetch the user's profile ID from public.users using their auth_id
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
       .select('id')
-      .eq('auth_id', authUser.id)
+      .eq('auth_id', authApiUser.id)
       .single();
 
     if (profileError || !userProfile) {
-      console.error('Error fetching user profile ID:', profileError);
-      return NextResponse.json({ error: 'Could not retrieve user profile.' }, { status: 500 });
+      console.error(`API /api/orders: Error fetching user profile ID for auth_id ${authApiUser.id}:`, profileError);
+      return NextResponse.json({ error: 'Could not retrieve user profile to fetch orders.' }, { status: 500 });
     }
     const userId = userProfile.id;
+    console.log(`API /api/orders: User profile ID for querying orders: ${userId}`);
 
     // Fetch orders and their items for the user
     const { data: rawOrderData, error: ordersError } = await supabase
@@ -52,9 +62,10 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
+      console.error(`API /api/orders: Error fetching orders for user ID ${userId}:`, ordersError);
       return NextResponse.json({ error: 'Failed to fetch orders.' }, { status: 500 });
     }
+    console.log(`API /api/orders: Successfully fetched ${rawOrderData.length} orders for user ID ${userId}`);
 
     // Transform data to match the frontend's DisplayOrder structure
     const formattedOrders: DisplayOrder[] = rawOrderData.map(order => {
@@ -88,3 +99,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+
