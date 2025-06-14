@@ -34,7 +34,7 @@ export default function SignUpPage() {
     if (success) {
       // User will get a verification email. Redirect to sign-in or a "please verify" page.
       // For now, redirect to sign-in page. AppContext onAuthStateChange will handle full login after verification.
-      router.push('/auth/signin');
+      router.push('/signin'); // Corrected path
     }
   };
 
@@ -44,7 +44,7 @@ export default function SignUpPage() {
         if (userProfile.role === 'admin') {
           router.push('/admin/dashboard');
         } else {
-          router.push('/account'); 
+          router.push('/account');
         }
       }
       // If authUser exists but userProfile is not yet loaded, wait for profile. Loader below handles this.
@@ -59,7 +59,7 @@ export default function SignUpPage() {
       </div>
     );
   }
-  
+
   // If already logged in (authUser exists and auth not loading)
   // and trying to access sign-up, show loader while redirecting.
   if (authUser && !isLoadingAuth) {
@@ -125,7 +125,7 @@ export default function SignUpPage() {
           </Button>
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link href="/auth/signin" className="font-medium text-primary hover:underline">
+            <Link href="/signin" className="font-medium text-primary hover:underline"> {/* Corrected path */}
               Sign In
             </Link>
           </p>

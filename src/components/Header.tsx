@@ -233,7 +233,7 @@ export function Header() {
                 </Button>
               </Link>
             ) : (
-              <Link href="/auth/signin" passHref>
+              <Link href="/signin" passHref> {/* Corrected path */}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -295,5 +295,3 @@ export function Header() {
     </header>
   );
 }
-
-    
