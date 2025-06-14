@@ -24,9 +24,9 @@ import { useToast } from '@/hooks/use-toast';
 // --- IMPORTANT ---
 // This `allPossibleCategories` array MUST be updated to reflect your actual `categories` table in Supabase.
 // The `id` MUST match the `id` from your database.
-// The `value` is a string identifier used internally by the frontend (must be unique and part of ProductCategory type).
+// The `value` is a string identifier used internally by the frontend (must be unique and part of ProductCategory type in src/types/index.ts).
 // The `label` is what users see in the dropdown.
-// The `section` helps group categories visually in the dropdown (must be part of AppSection type).
+// The `section` helps group categories visually (must be part of AppSection type in src/types/index.ts).
 //
 // Example: If your DB `categories` table has:
 // { id: 1, name: 'Fresh Meats' }, { id: 2, name: 'Organic Vegetables' }
@@ -50,12 +50,11 @@ const allPossibleCategories: { id: number; value: ProductCategory; label: string
   { id: 9, value: 'pizza', label: 'Pizza', section: 'fastfood' },
   { id: 10, value: 'sides', label: 'Sides', section: 'fastfood' },
   { id: 11, value: 'drinks', label: 'Drinks', section: 'fastfood' },
-  // New example categories (REPLACE THESE WITH YOUR ACTUAL DB DATA, IDs, and ensure types are updated)
+  // Example additional categories (REPLACE THESE WITH YOUR ACTUAL DB DATA)
   { id: 100, value: 'electronics', label: 'Electronics', section: 'tech' },
   { id: 101, value: 'clothing', label: 'Clothing', section: 'fashion' },
   { id: 102, value: 'books', label: 'Books', section: 'literature' },
-  // Fallback or uncategorized - ensure it's handled correctly if products can be uncategorized
-  // { id: 999, value: 'all', label: 'Uncategorized', section: 'other' },
+  // { id: 999, value: 'all', label: 'Uncategorized', section: 'other' }, // Use 'all' for filter, not as assignable category
 ];
 
 
@@ -80,16 +79,17 @@ export default function AdminProductsPage() {
       const data = await response.json();
       
       const formattedProducts: Product[] = data.map((p: any) => {
-        const dbCategoryId = p.category_id?.id; // category_id is an object { id: number, name: string }
+        const dbCategoryId = p.category_id?.id;
         const matchedCategory = allPossibleCategories.find(cat => cat.id === dbCategoryId);
-        const frontendCategory = matchedCategory?.value || 'all'; // Default to 'all' or handle as uncategorized
+        // Fallback to a generic category string if no match, or handle as 'uncategorized'
+        const frontendCategory = matchedCategory?.value || (p.category_id?.name?.toLowerCase() as ProductCategory || 'all'); 
 
         return {
           id: p.id,
           name: p.name,
           description: p.description,
           price: parseFloat(p.price), 
-          category: frontendCategory as ProductCategory, // Ensure type safety
+          category: frontendCategory,
           image: p.product_images?.find((img: any) => img.is_primary)?.image_url || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
           'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
         };
@@ -98,7 +98,7 @@ export default function AdminProductsPage() {
     } catch (error) {
       console.error("Fetch products error:", error);
       toast({ title: "Error Fetching Products", description: (error as Error).message, variant: "destructive" });
-      setProducts([]); // Clear products on error
+      setProducts([]);
     } finally {
       setIsLoadingProducts(false);
     }
@@ -116,7 +116,7 @@ export default function AdminProductsPage() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
-    toast({ title: "Edit Mode (UI Only)", description: "Editing a product opens the form pre-filled. Backend PUT API for update is not yet implemented by the client."});
+    toast({ title: "Editing Product", description: "The form is pre-filled. Implement the PUT API at /api/products/[id] to save changes."});
     setIsFormOpen(true);
   };
 
@@ -134,9 +134,8 @@ export default function AdminProductsPage() {
         throw new Error(errorData.error || 'Failed to delete product');
       }
       
-      // setProducts(products.filter(p => p.id !== productId)); // Optimistic update
-      fetchProducts(); // Re-fetch for consistency after successful deletion
-      toast({ title: "Product Deleted", description: `Product ${productId} has been removed.` });
+      fetchProducts(); 
+      toast({ title: "Product Deleted", description: `Product has been removed.` });
     } catch (error) {
       console.error("Delete product error:", error);
       toast({ title: "Error Deleting Product", description: (error as Error).message, variant: "destructive" });
@@ -148,7 +147,12 @@ export default function AdminProductsPage() {
 
   const handleFormSubmit = async (data: ProductFormSubmitData) => {
     setIsSubmitting(true);
-    const loadingToastId = toast({ title: data.id ? "Updating product..." : "Adding new product...", description: "Please wait.", duration: Infinity }).id;
+    const isUpdating = !!data.id;
+    const loadingToastId = toast({ 
+        title: isUpdating ? "Updating product..." : "Adding new product...", 
+        description: "Please wait.", 
+        duration: Infinity 
+    }).id;
 
     const formData = new FormData();
     formData.append('name', data.name);
@@ -160,7 +164,7 @@ export default function AdminProductsPage() {
     if (categoryDetails) {
       formData.append('category_id', categoryDetails.id.toString());
     } else {
-      toast({ title: "Category Error", description: `Selected category "${data.category}" is not configured correctly. Please check admin settings and ensure allPossibleCategories array matches DB.`, variant: "destructive" });
+      toast({ title: "Category Error", description: `Selected category "${data.category}" is not configured. Please update 'allPossibleCategories' in AdminProductsPage.tsx.`, variant: "destructive" });
       setIsSubmitting(false);
       if(loadingToastId) toast.dismiss(loadingToastId);
       return;
@@ -170,60 +174,49 @@ export default function AdminProductsPage() {
     if (data.imageFile) {
       formData.append('imageFile', data.imageFile, data.imageFile.name);
     }
+    // If updating and no new imageFile is provided, the backend should know not to change the image.
+    // The 'currentImageUrl' can be useful for the backend to know the existing image if needed for replacement logic.
+    if (data.currentImageUrl && !data.imageFile) {
+        formData.append('currentImageUrl', data.currentImageUrl);
+    }
     
-    formData.append('data_ai_hint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product'); // Corrected key
+    formData.append('data_ai_hint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product');
 
     try {
       let response;
-      if (data.id) {
-        // UPDATE (PUT) LOGIC - Not yet implemented on client or backend.
-        // You would typically make a PUT request to /api/products/${data.id}
-        // For now, this just updates UI optimistically.
-        toast({ title: "Update Not Implemented (UI Mock)", description: "Product update API endpoint is not yet connected to this form. Displaying mock update.", variant: "default" });
-        const productData: Product = {
-            id: data.id,
-            name: data.name,
-            description: data.description,
-            price: parseFloat(data.price),
-            category: data.category,
-            image: data.imageFile ? URL.createObjectURL(data.imageFile) : data.currentImageUrl || `https://placehold.co/100x100.png?text=${data.name.substring(0,1)}`,
-           'data-ai-hint': data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product',
-        };
-        setProducts(products.map(p => (p.id === data.id ? productData : p)));
-        setIsFormOpen(false); 
-        setEditingProduct(null);
+      if (isUpdating) {
+        response = await fetch(`/api/products/${data.id}`, {
+          method: 'PUT',
+          body: formData,
+        });
       } else {
-        // CREATE (POST) LOGIC
         response = await fetch('/api/products', {
           method: 'POST',
           body: formData,
-          // Headers are not explicitly set for FormData; browser handles multipart/form-data
         });
+      }
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Server error during product creation. Unable to parse error response.' }));
-          throw new Error(errorData.error || 'Failed to add product');
-        }
-        
-        const result = await response.json();
-        if (result.success && result.product) {
-          toast({ title: "Product Added", description: `${result.product.name} has been successfully added.` });
-          fetchProducts(); // Re-fetch to get the latest list including the new product with its server-assigned ID and image URL
-          setIsFormOpen(false); 
-          setEditingProduct(null);
-        } else {
-          throw new Error(result.error || "Unknown error from API after adding product.");
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `Server error during product ${isUpdating ? 'update' : 'creation'}.` }));
+        throw new Error(errorData.error || `Failed to ${isUpdating ? 'update' : 'add'} product`);
+      }
+      
+      const result = await response.json();
+      if (result.success) {
+        toast({ title: `Product ${isUpdating ? 'Updated' : 'Added'}`, description: `${data.name} has been successfully ${isUpdating ? 'updated' : 'added'}.` });
+        fetchProducts(); 
+        setIsFormOpen(false); 
+        setEditingProduct(null);
+      } else {
+        throw new Error(result.error || `Unknown error from API after ${isUpdating ? 'updating' : 'adding'} product.`);
       }
 
     } catch (error) {
-      console.error("Product submission error:", error);
-      toast({ title: `Product ${data.id ? 'Update' : 'Add'} Failed`, description: (error as Error).message, variant: "destructive" });
+      console.error(`Product ${isUpdating ? 'update' : 'submission'} error:`, error);
+      toast({ title: `Product ${isUpdating ? 'Update' : 'Add'} Failed`, description: (error as Error).message, variant: "destructive" });
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsSubmitting(false);
-      // Do not close form or reset editingProduct on error, allow user to correct.
-      // Only close/reset on success.
     }
   };
 
@@ -236,9 +229,9 @@ export default function AdminProductsPage() {
   });
   
   const formSelectableCategories = allPossibleCategories
-    .filter(cat => cat.value !== 'all') 
+    .filter(cat => cat.value !== 'all') // Ensure 'all' is not an assignable category
     .map(c => ({
-      value: c.value, 
+      value: c.value as ProductCategory, // Cast here if `value` can include 'all' in `allPossibleCategories` type.
       label: `${c.label} (${c.section})`
     }));
 
@@ -251,7 +244,7 @@ export default function AdminProductsPage() {
           <p className="text-muted-foreground">Add, edit, or remove products from your store.</p>
         </div>
         <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting || isLoadingProducts}>
-          {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
+          {(isSubmitting && !editingProduct) || (isLoadingProducts && !products.length) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
           Add New Product
         </Button>
       </header>
@@ -328,7 +321,7 @@ export default function AdminProductsPage() {
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       <Button variant="destructive" size="icon" onClick={() => handleDeleteProduct(product.id)} title="Delete" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        {isSubmitting && editingProduct?.id !== product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
                     </div>
                   </TableCell>
