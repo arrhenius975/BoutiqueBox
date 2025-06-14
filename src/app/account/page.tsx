@@ -2,24 +2,46 @@
 // src/app/account/page.tsx
 "use client";
 
+import React, { useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit3, MapPin, Package, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote } from "lucide-react"; // Changed here
+import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2 } from "lucide-react";
 import Link from "next/link";
-import React from "react"; // Added React import
+import { useAppContext } from '@/contexts/AppContext';
+import { useRouter } from 'next/navigation';
 
 export default function AccountPage() {
-  // Placeholder data - in a real app, this would come from user state/API
+  const { authUser, userProfile, isLoadingAuth, signOut } = useAppContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoadingAuth && !authUser) {
+      router.push('/auth/signin');
+    }
+  }, [authUser, isLoadingAuth, router]);
+
+  if (isLoadingAuth || !userProfile) {
+    return (
+      <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const user = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    avatarUrl: "https://placehold.co/100x100.png",
-    initials: "JD",
-    address: "123 Main St, Anytown, CA 90210",
+    name: userProfile.name || "User",
+    email: userProfile.email,
+    avatarUrl: "https://placehold.co/100x100.png", // Placeholder, replace with actual if available
+    initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email.substring(0,2).toUpperCase()),
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    // AppContext will handle redirect after signout
   };
 
   return (
@@ -29,7 +51,6 @@ export default function AccountPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Sidebar / Profile Summary */}
         <div className="md:col-span-1 space-y-6">
           <Card>
             <CardHeader className="items-center text-center">
@@ -46,12 +67,12 @@ export default function AccountPage() {
               </Button>
             </CardContent>
           </Card>
-           <Button variant="destructive" className="w-full">
+           <Button variant="destructive" className="w-full" onClick={handleLogout} disabled={isLoadingAuth}>
+             {isLoadingAuth && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <LogOut className="mr-2 h-4 w-4" /> Log Out
           </Button>
         </div>
 
-        {/* Main Content Area */}
         <div className="md:col-span-2 space-y-8">
           <Card>
             <CardHeader>
@@ -82,12 +103,12 @@ export default function AccountPage() {
             <CardContent className="space-y-1">
               {[
                 { label: "Order History", icon: ShoppingBasket, href: "/account/orders" },
-                { label: "Saved Addresses", icon: MapPin, href: "#" }, // Placeholder for future Saved Addresses page
-                { label: "Payment Methods", icon: CreditCard, href: "#" }, // Placeholder for future Payment Methods page
-                { label: "Notification Preferences", icon: Bell, href: "/settings" }, // Link to existing settings page
-                { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context") }, // Needs context integration
-                { label: "Security & Password", icon: ShieldCheck, href: "#" }, // Placeholder
-                { label: "Help & Support", icon: MessageSquareQuote, href: "/help" }, // Changed here
+                { label: "Saved Addresses", icon: MapPin, href: "#" },
+                { label: "Payment Methods", icon: CreditCard, href: "#" },
+                { label: "Notification Preferences", icon: Bell, href: "/settings" },
+                { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context") },
+                { label: "Security & Password", icon: ShieldCheck, href: "#" },
+                { label: "Help & Support", icon: MessageSquareQuote, href: "/help" },
               ].map(item => (
                 <React.Fragment key={item.label}>
                   <Link
@@ -111,3 +132,5 @@ export default function AccountPage() {
     </div>
   );
 }
+
+    

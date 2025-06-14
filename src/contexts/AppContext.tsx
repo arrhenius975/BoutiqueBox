@@ -1,11 +1,13 @@
 
 "use client";
 
-import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SectionCategory, SearchFilterType } from '@/types';
+import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SearchFilterType, SupabaseUser } from '@/types';
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { generatePersonalizedRecommendations, type PersonalizedRecommendationsOutput } from '@/ai/flows/personalized-recommendations';
+import { supabase } from '@/data/supabase';
+import type { User as AuthUser, Session } from '@supabase/supabase-js';
 
 // Import section-specific data
 import { groceryProducts, groceryCategories } from '@/data/groceryProducts';
@@ -73,6 +75,15 @@ interface AppContextType {
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
 
+  // Auth related
+  authUser: AuthUser | null;
+  userProfile: SupabaseUser | null;
+  isLoadingAuth: boolean;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+
+
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
@@ -95,6 +106,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentSection, setCurrentSection] = useState<AppSection | null>(null);
   const [currentSectionConfig, setCurrentSectionConfig] = useState<SectionConfig | null>(null);
 
@@ -110,6 +122,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchFilterType, setSearchFilterType] = useState<SearchFilterType>('all');
   const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system');
+
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [userProfile, setUserProfile] = useState<SupabaseUser | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
 
   const { toast } = useToast();
 
@@ -130,14 +147,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     const applyCurrentTheme = () => {
-      // Use the React state 'theme' as the source of truth for user's choice
       if (theme === 'dark') {
         root.classList.add('dark');
         root.style.colorScheme = 'dark';
       } else if (theme === 'light') {
         root.classList.remove('dark');
         root.style.colorScheme = 'light';
-      } else { // theme === 'system'
+      } else { 
         if (mediaQuery.matches) {
           root.classList.add('dark');
           root.style.colorScheme = 'dark';
@@ -148,16 +164,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    applyCurrentTheme(); // Apply on mount and when theme state changes
+    applyCurrentTheme(); 
 
     if (theme === 'system') {
       mediaQuery.addEventListener('change', applyCurrentTheme);
       return () => mediaQuery.removeEventListener('change', applyCurrentTheme);
     } else {
-      // Clean up listener if theme is not 'system' anymore
       mediaQuery.removeEventListener('change', applyCurrentTheme);
     }
-  }, [theme]); // Re-run when theme (user's choice) changes
+  }, [theme]);
 
 
  useEffect(() => {
@@ -189,8 +204,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setSelectedCategory('all');
       }
     } else {
-      // Navigating to a global page like /sections, /, /help, /account, /settings
-      if (currentSection !== null) { // If previously in a specific section
+      if (currentSection !== null) { 
         setCurrentSection(null);
         setCurrentSectionConfig(null);
         setCart([]);
@@ -198,14 +212,119 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setViewedProducts([]);
         setRecommendations([]);
         setSelectedCategory('all');
-         // Clear search term if leaving a section for a non-section global page
-        if (pathname === '/' && searchTerm) { // Specifically for root, if others needed, expand this
+        if (pathname === '/' && searchTerm) { 
             setSearchTerm('');
             setSearchFilterType('all');
         }
       }
     }
   }, [pathname, currentSection, searchTerm]);
+
+  // Auth state change listener
+  useEffect(() => {
+    setIsLoadingAuth(true);
+    const getInitialSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            setAuthUser(session.user);
+            const { data: profile, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('auth_id', session.user.id)
+                .single();
+            if (error) {
+                console.error('Error fetching user profile:', error);
+            } else {
+                setUserProfile(profile as SupabaseUser);
+            }
+        }
+        setIsLoadingAuth(false);
+    };
+    getInitialSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setIsLoadingAuth(true);
+      setAuthUser(session?.user ?? null);
+      if (session?.user) {
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', session.user.id)
+          .single();
+        if (error) {
+          toast({ title: "Error fetching profile", description: error.message, variant: "destructive" });
+          setUserProfile(null);
+        } else {
+          setUserProfile(profile as SupabaseUser);
+        }
+      } else {
+        setUserProfile(null);
+      }
+      setIsLoadingAuth(false);
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [toast]);
+
+  const signInWithEmail = async (email: string, password: string) => {
+    setIsLoadingAuth(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      toast({ title: "Sign In Failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Signed In Successfully!"});
+      // Profile will be fetched by onAuthStateChange
+    }
+    setIsLoadingAuth(false);
+  };
+
+  const signUpWithEmail = async (name: string, email: string, password: string) => {
+    setIsLoadingAuth(true);
+    const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+            data: { name: name } // This name is for auth.users.user_metadata, trigger handles users table
+        }
+    });
+
+    if (error) {
+      toast({ title: "Sign Up Failed", description: error.message, variant: "destructive" });
+    } else if (data.user) {
+      // The trigger 'handle_new_user' should create a row in public.users.
+      // We can then update it with the name if needed, although the trigger might be enough if it also handles name.
+      // For now, we assume the trigger handles email, and the user can update their name on their profile page.
+      // If your handle_new_user trigger doesn't include name, you'd do an update here.
+      // Example if name needs to be updated on public.users after signup and trigger:
+      // const { error: updateError } = await supabase
+      //   .from('users')
+      //   .update({ name: name })
+      //   .eq('auth_id', data.user.id);
+      // if (updateError) {
+      //    toast({ title: "Profile Update Failed", description: updateError.message, variant: "destructive" });
+      // }
+
+      toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
+    }
+    setIsLoadingAuth(false);
+  };
+  
+  const signOut = async () => {
+    setIsLoadingAuth(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
+    } else {
+      setAuthUser(null);
+      setUserProfile(null);
+      toast({ title: "Signed Out"});
+      router.push('/'); // Redirect to home after sign out
+    }
+    setIsLoadingAuth(false);
+  };
+
 
   const addToCart = useCallback((product: Product) => {
     setCart((prevCart) => {
@@ -348,6 +467,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setSearchFilterType,
         theme,
         setTheme,
+        authUser,
+        userProfile,
+        isLoadingAuth,
+        signInWithEmail,
+        signUpWithEmail,
+        signOut,
         addToCart,
         removeFromCart,
         updateCartQuantity,
@@ -375,3 +500,4 @@ export const useAppContext = () => {
   return context;
 };
 
+    

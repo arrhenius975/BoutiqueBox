@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter } from 'lucide-react';
+import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn } from 'lucide-react'; // Added User, LogIn
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,8 @@ export function Header() {
     setSearchTerm,
     searchFilterType,
     setSearchFilterType,
+    authUser, // Added from context
+    isLoadingAuth, // Added from context
   } = useAppContext();
   const pathname = usePathname();
 
@@ -52,7 +54,7 @@ export function Header() {
   const sectionPath = currentSectionConfig?.path || '/';
 
 
-  const isAppFeaturePage = pathname === '/sections' || // Search enabled on section selector
+  const isAppFeaturePage = pathname === '/sections' ||
                            pathname.startsWith('/grocery') ||
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood');
@@ -99,7 +101,7 @@ export function Header() {
         "rounded-b-[50px]",
         currentSectionConfig && currentSection
           ? "bg-[hsl(var(--header-bg-hsl)/0.85)] text-[hsl(var(--header-fg-hsl))] supports-[backdrop-filter]:bg-[hsl(var(--header-bg-hsl)/0.65)]"
-          : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65", // Default for /sections or new /
+          : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65",
         "transition-transform duration-300 ease-in-out",
         !isHeaderVisible && "-translate-y-full"
       )}
@@ -107,7 +109,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
           <Link
-            href={currentSection ? sectionPath : "/"} // Links to section home or main app home
+            href={currentSection ? sectionPath : "/"}
             className={cn(
               "flex items-center gap-2",
               currentSectionConfig ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
@@ -116,7 +118,7 @@ export function Header() {
             <ShoppingBag className="h-7 w-7" />
             <span className="font-headline text-xl md:text-2xl font-bold">{sectionName}</span>
           </Link>
-          {currentSection && ( // Only show "Delivering to" if in a specific section
+          {currentSection && (
             <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
               <span>Delivering to: CA, USA</span>
@@ -124,7 +126,7 @@ export function Header() {
           )}
         </div>
 
-        {isAppFeaturePage && ( // Search bar shown on /sections and section homepages
+        {isAppFeaturePage && (
           <div className="flex-1 min-w-0 px-2 md:px-4">
             <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto flex items-center">
               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -134,12 +136,12 @@ export function Header() {
                 className={cn(
                   "w-full rounded-lg bg-transparent py-2 pl-8 h-9 text-sm",
                   (currentSectionConfig && currentSection) ? "border-[hsl(var(--header-fg-hsl)/0.3)] text-[hsl(var(--header-fg-hsl))] placeholder:text-[hsl(var(--header-fg-hsl)/0.7)] focus:bg-[hsl(var(--background))] focus:text-foreground" : "border-input placeholder:text-muted-foreground focus:bg-background/50",
-                  (currentSectionConfig && currentSection) ? "pr-10" : "pr-2" // More padding if filter is present (only in sections)
+                  (currentSectionConfig && currentSection) ? "pr-10" : "pr-2"
                 )}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {(currentSectionConfig && currentSection) && ( // Filter only shown inside a specific product section
+              {(currentSectionConfig && currentSection) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -173,7 +175,7 @@ export function Header() {
           "flex items-center gap-1 sm:gap-2 shrink-0",
            (currentSectionConfig && currentSection) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
         )}>
-          {currentSection && ( // Recommendations only shown inside a specific section
+          {currentSection && (
             <Button
               variant="ghost"
               size="icon"
@@ -217,12 +219,39 @@ export function Header() {
               </Badge>
             )}
           </Button>
+          {!isLoadingAuth && (
+            authUser ? (
+              <Link href="/account" passHref>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="My Account"
+                  className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                  title="My Account"
+                >
+                  <User className="h-5 w-5 md:h-6 md:w-6" />
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/auth/signin" passHref>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Sign In"
+                  className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && currentSection) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                  title="Sign In / Sign Up"
+                >
+                  <LogIn className="h-5 w-5 md:h-6 md:w-6" />
+                </Button>
+              </Link>
+            )
+          )}
         </nav>
       </div>
 
-      {currentSection && categoriesList.length > 0 && ( // Category arc only shown inside a specific section
-         <div className="relative h-36 md:h-40 mt-2 flex justify-center items-start"> {/* Increased height */}
-          <div className="relative w-[280px] h-[140px] sm:w-[360px] sm:h-[140px] md:w-[420px] md:h-[140px]"> {/* Increased height */}
+      {currentSection && categoriesList.length > 0 && (
+         <div className="relative h-36 md:h-40 mt-2 flex justify-center items-start">
+          <div className="relative w-[280px] h-[140px] sm:w-[360px] sm:h-[140px] md:w-[420px] md:h-[140px]">
             {categoriesList.map((category, index) => {
               const angle = numCategories > 1 ? startAngle + (index / (numCategories - 1)) * angleSpan : 0;
               const radian = angle * (Math.PI / 180);
@@ -266,3 +295,5 @@ export function Header() {
     </header>
   );
 }
+
+    
