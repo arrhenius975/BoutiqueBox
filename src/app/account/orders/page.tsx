@@ -13,7 +13,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { DisplayOrder } from '@/types'; // Use the shared type
+import type { DisplayOrder } from '@/types';
+import { useAppContext } from '@/contexts/AppContext';
 
 const getStatusBadgeVariant = (status: DisplayOrder['status']) => {
   switch (status) {
@@ -21,8 +22,8 @@ const getStatusBadgeVariant = (status: DisplayOrder['status']) => {
     case 'Shipped': return 'secondary';
     case 'Processing': return 'outline';
     case 'Cancelled': return 'destructive';
-    case 'pending': return 'outline'; // Assuming 'pending' might be a status
-    case 'paid': return 'default'; // Assuming 'paid' is like a delivered/good status
+    case 'pending': return 'outline';
+    case 'paid': return 'default';
     default: return 'outline';
   }
 };
@@ -31,12 +32,18 @@ export default function OrderHistoryPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<DisplayOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const { authUser, isLoadingAuth } = useAppContext();
 
   const fetchOrders = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+    if (!authUser) { // Should ideally be caught by useEffect, but defensive
+        setIsFetchingOrders(false);
+        setFetchError("User not authenticated. Please sign in.");
+        return;
+    }
+    setIsFetchingOrders(true);
+    setFetchError(null);
     try {
       const response = await fetch('/api/orders');
       if (!response.ok) {
@@ -47,31 +54,42 @@ export default function OrderHistoryPage() {
       setOrders(data);
     } catch (err: any) {
       console.error("Fetch orders error:", err);
-      setError(err.message || 'An unexpected error occurred.');
-      toast({
-        title: "Error Fetching Orders",
-        description: err.message || 'Could not load your order history.',
-        variant: "destructive",
-      });
+      setFetchError(err.message || 'An unexpected error occurred.');
+      // Toast only if the error occurred during an authenticated attempt
+      if (authUser) {
+        toast({
+          title: "Error Fetching Orders",
+          description: err.message || 'Could not load your order history.',
+          variant: "destructive",
+        });
+      }
     } finally {
-      setIsLoading(false);
+      setIsFetchingOrders(false);
     }
-  }, [toast]);
+  }, [toast, authUser]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (!isLoadingAuth) {
+      if (authUser) {
+        fetchOrders();
+      } else {
+        setOrders([]);
+        setFetchError("Please log in to view your order history.");
+        setIsFetchingOrders(false);
+      }
+    }
+  }, [authUser, isLoadingAuth, fetchOrders]);
 
-  if (isLoading) {
+  if (isLoadingAuth || (authUser && isFetchingOrders && !fetchError)) {
     return (
       <div className="container mx-auto py-8 px-4 flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your orders...</p>
+        <p className="text-muted-foreground">{isLoadingAuth ? "Verifying authentication..." : "Loading your orders..."}</p>
       </div>
     );
   }
 
-  if (error) {
+  if (fetchError) {
     return (
       <div className="container mx-auto py-8 px-4">
          <header className="mb-8 flex items-center justify-between">
@@ -82,12 +100,17 @@ export default function OrderHistoryPage() {
                 <h1 className="font-headline text-3xl font-bold text-primary">Order History</h1>
             </div>
         </header>
-        <Alert variant="destructive" className="max-w-2xl mx-auto">
+        <Alert variant={!authUser || fetchError === "Please log in to view your order history." ? "default" : "destructive"} className="max-w-2xl mx-auto">
           <AlertTriangle className="h-5 w-5" />
-          <AlertTitle>Error Loading Orders</AlertTitle>
+          <AlertTitle>{!authUser ? "Access Denied" : "Error Loading Orders"}</AlertTitle>
           <AlertDescription>
-            {error} Please try again later or contact support if the issue persists.
-            <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2">Try again</Button>
+            {fetchError}
+            {authUser && fetchError !== "Please log in to view your order history." && <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2">Try again</Button>}
+            {!authUser && (
+                <Button asChild variant="link" className="p-0 h-auto ml-2">
+                    <Link href={`/signin?redirect=/account/orders`}>Sign In</Link>
+                </Button>
+            )}
           </AlertDescription>
         </Alert>
       </div>
