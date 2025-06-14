@@ -13,11 +13,11 @@ import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, H
 import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/data/supabase';
+// Removed direct supabase import, API call will handle it
 import { useToast } from '@/hooks/use-toast';
 
 export default function AccountPage() {
-  const { authUser, userProfile, isLoadingAuth, signOut, setUserProfile } = useAppContext(); // Added setUserProfile for local updates
+  const { authUser, userProfile, isLoadingAuth, signOut, setUserProfile } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
   const [localAvatarPreviewUrl, setLocalAvatarPreviewUrl] = useState<string | null>(null);
@@ -30,12 +30,13 @@ export default function AccountPage() {
     }
   }, [authUser, isLoadingAuth, router]);
 
-  // Set initial avatar preview from profile if available
   useEffect(() => {
     if (userProfile?.avatar_url) {
       setLocalAvatarPreviewUrl(userProfile.avatar_url);
+    } else if (userProfile) { // If profile exists but no avatar_url, clear preview
+        setLocalAvatarPreviewUrl(null);
     }
-  }, [userProfile?.avatar_url]);
+  }, [userProfile]);
 
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,47 +49,53 @@ export default function AccountPage() {
     }
 
     const file = event.target.files[0];
-    const fileName = `avatar.${file.name.split('.').pop()}`; // e.g., avatar.jpg
-    const filePath = `${authUser.id}/${fileName}`; // Path: user_auth_id/avatar.jpg
+    
+    const formData = new FormData();
+    formData.append('avatar', file);
 
     setIsUploadingAvatar(true);
-    const loadingToast = toast({ title: "Uploading avatar...", description: "Please wait.", duration: Infinity });
+    const loadingToastId = toast({ title: "Uploading avatar...", description: "Please wait.", duration: Infinity }).id;
 
-    const { error: uploadError } = await supabase.storage
-      .from('profile-pictures') // Bucket name from your plan
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: true, // Overwrite existing avatar
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        body: formData,
+        // Headers are not explicitly set for FormData; browser handles multipart/form-data
       });
 
-    loadingToast.dismiss();
-    setIsUploadingAvatar(false);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Server error during avatar upload."}));
+        throw new Error(errorData.error || 'Avatar upload failed');
+      }
 
-    if (uploadError) {
-      console.error('Avatar Upload Error:', uploadError);
-      toast({ title: 'Avatar Upload Failed', description: uploadError.message, variant: 'destructive' });
-    } else {
-      const { data: urlData } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(filePath);
-      
-      if (urlData.publicUrl) {
-        setLocalAvatarPreviewUrl(urlData.publicUrl);
-        // In a real app, update userProfile in DB:
-        // await supabase.from('users').update({ avatar_url: urlData.publicUrl }).eq('auth_id', authUser.id);
-        // And then re-fetch or update AppContext's userProfile
-        if (setUserProfile && userProfile) { // Check if setUserProfile exists
-            setUserProfile({...userProfile, avatar_url: urlData.publicUrl });
+      const result = await response.json();
+
+      if (result.success && result.avatarUrl) {
+        setLocalAvatarPreviewUrl(result.avatarUrl);
+        // Update AppContext's userProfile if the API returns the full updated profile or at least the new avatar_url
+        if (setUserProfile && userProfile) {
+            setUserProfile({...userProfile, avatar_url: result.avatarUrl });
         }
         toast({ title: 'Avatar Uploaded Successfully!' });
       } else {
-        toast({ title: 'Failed to get public URL', description: 'Avatar uploaded but URL retrieval failed.', variant: 'destructive' });
+        throw new Error(result.error || 'Failed to get avatar URL from API response.');
+      }
+
+    } catch (error) {
+      console.error('Avatar Upload Error:', error);
+      toast({ title: 'Avatar Upload Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      if(loadingToastId) toast.dismiss(loadingToastId);
+      setIsUploadingAvatar(false);
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     }
   };
 
 
-  if (isLoadingAuth || (!authUser && !userProfile)) { // Check both authUser and userProfile before rendering
+  if (isLoadingAuth || (!authUser && !userProfile)) {
     return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -96,8 +103,7 @@ export default function AccountPage() {
     );
   }
   
-  // If authUser exists but userProfile is still loading (edge case, should be quick)
-  if (authUser && !userProfile) {
+  if (authUser && !userProfile && !isLoadingAuth) { // Auth user exists, but profile still loading or failed
      return (
       <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -106,8 +112,7 @@ export default function AccountPage() {
     );
   }
 
-  // This should not be reached if useEffect redirect works, but as a safeguard:
-  if (!authUser || !userProfile) {
+  if (!authUser || !userProfile) { // Should be caught by useEffect, but safeguard
       router.push('/auth/signin');
       return (
            <div className="flex min-h-[calc(100vh-200px)] items-center justify-center">
@@ -118,17 +123,15 @@ export default function AccountPage() {
   }
 
 
-  const user = {
+  const userDisplay = {
     name: userProfile.name || "User",
     email: userProfile.email,
-    // Use localAvatarPreviewUrl if available, then userProfile.avatar_url (from DB, if implemented), then placeholder
-    avatarUrl: localAvatarPreviewUrl || userProfile.avatar_url || "https://placehold.co/100x100.png?text=User",
+    avatarUrl: localAvatarPreviewUrl || userProfile.avatar_url || `https://placehold.co/100x100.png?text=${(userProfile.name || userProfile.email || 'U').substring(0,1).toUpperCase()}`,
     initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email?.substring(0,2).toUpperCase() || 'U'),
   };
 
   const handleLogout = async () => {
     await signOut();
-    // AppContext will handle redirect after signout, usually to '/'
   };
 
   return (
@@ -143,8 +146,8 @@ export default function AccountPage() {
             <CardHeader className="items-center text-center">
               <div className="relative group w-24 h-24 mx-auto mb-4">
                 <Avatar className="w-24 h-24 ring-2 ring-primary ring-offset-2">
-                  <AvatarImage src={user.avatarUrl} alt={user.name} data-ai-hint="profile person" />
-                  <AvatarFallback>{user.initials}</AvatarFallback>
+                  <AvatarImage src={userDisplay.avatarUrl} alt={userDisplay.name} data-ai-hint="profile person" />
+                  <AvatarFallback>{userDisplay.initials}</AvatarFallback>
                 </Avatar>
                 <Button
                   variant="outline"
@@ -165,15 +168,15 @@ export default function AccountPage() {
                     disabled={isUploadingAvatar}
                 />
               </div>
-              <CardTitle className="text-2xl">{user.name}</CardTitle>
-              <CardDescription>{user.email}</CardDescription>
+              <CardTitle className="text-2xl">{userDisplay.name}</CardTitle>
+              <CardDescription>{userDisplay.email}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full">
                 <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Details
               </Button>
                <p className="text-xs text-muted-foreground text-center pt-1">
-                Avatar upload uses Supabase Storage. Ensure bucket 'profile-pictures' and policies are set up. Avatar persistence requires DB schema update.
+                Avatar upload interacts with an API. Ensure your backend handles the avatar update and persists the URL.
               </p>
             </CardContent>
           </Card>
@@ -192,11 +195,11 @@ export default function AccountPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" defaultValue={user.name} />
+                <Input id="name" defaultValue={userDisplay.name} />
               </div>
               <div>
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue={user.email} disabled />
+                <Input id="email" type="email" defaultValue={userDisplay.email} disabled />
               </div>
               <div>
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
@@ -242,3 +245,5 @@ export default function AccountPage() {
     </div>
   );
 }
+
+    
