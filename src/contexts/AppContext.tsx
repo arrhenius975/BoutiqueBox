@@ -242,10 +242,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     setIsLoadingAuth(true);
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Supabase Auth Event:', event, 'Session User:', session?.user?.email, 'Confirmed:', session?.user?.email_confirmed_at);
       const currentAuthUser = session?.user ?? null;
       setAuthUser(currentAuthUser);
 
       if (currentAuthUser) {
+        if (event === 'SIGNED_IN' && !currentAuthUser.email_confirmed_at) {
+          console.log('User signed in but email not yet confirmed.');
+        } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
+          // Check if email_confirmed_at exists and userProfile email is not set, indicating a fresh confirmation
+          console.log('User email confirmed or user updated post-confirmation.');
+          toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
+        }
         await fetchUserProfile(currentAuthUser.id);
       } else {
         setUserProfile(null);
@@ -257,6 +265,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const { data: { session } } = await supabase.auth.getSession();
         const initialAuthUser = session?.user ?? null;
         setAuthUser(initialAuthUser);
+        console.log('Initial Session User:', initialAuthUser?.email, 'Confirmed:', initialAuthUser?.email_confirmed_at);
 
         if (initialAuthUser) {
             await fetchUserProfile(initialAuthUser.id);
@@ -270,7 +279,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, toast, userProfile?.email]); // Added userProfile.email to dependencies
 
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
     setIsLoadingAuth(true);
@@ -281,10 +290,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(false);
       return false;
     }
-    // onAuthStateChange will handle setting authUser and fetching profile.
-    // setIsLoadingAuth will be set to false by onAuthStateChange.
     toast({ title: "Signed In Successfully!"});
-    return true; // Indicate success to the UI
+    return true; 
   };
 
   const signUpWithEmail = async (name: string, email: string, password: string): Promise<boolean> => {
@@ -293,7 +300,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         email, 
         password,
         options: {
-            data: { name: name } // This data is passed to the new user in auth.users, useful for triggers
+            data: { name: name } 
         }
     });
     
@@ -303,11 +310,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
-    // Supabase trigger 'handle_new_user' should create the profile in 'public.users'.
-    // onAuthStateChange will fetch it.
     toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
-    // setIsLoadingAuth will be set to false by onAuthStateChange.
-    return true; // Indicate success
+    return true; 
   };
   
   const signOut = async () => {
@@ -318,8 +322,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(false); 
     } else {
       toast({ title: "Signed Out"});
-      // State updates (authUser, userProfile to null) handled by onAuthStateChange.
-      // isLoadingAuth will be set to false by onAuthStateChange.
       router.push('/'); 
     }
   };
