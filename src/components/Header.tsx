@@ -86,7 +86,7 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 80;
+  const categoryArcRadius = 100; // Increased from 80 to 100 for a wider arc
   const yOffsetForArc = 5;
   const angleSpan = numCategories > 1 ? 180 : 0;
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
@@ -296,3 +296,4 @@ export function Header() {
     </header>
   );
 }
+
