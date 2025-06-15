@@ -300,35 +300,8 @@ const BoutiqueBoxLanding = () => {
                 Join thousands of satisfied customers who have transformed their lifestyle with BoutiqueBox.
               </p>
               
-              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mt-12">
-                <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-8 text-white">
-                  <h4 className="text-2xl font-bold mb-4">Individual Plan</h4>
-                  <p className="text-emerald-100 mb-6">Perfect for personal use</p>
-                  <ul className="space-y-2 text-sm text-emerald-100 mb-6">
-                    <li>• Up to 10 deliveries per month</li>
-                    <li>• Standard delivery speed</li>
-                    <li>• Basic customer support</li>
-                    <li>• Access to local products</li>
-                  </ul>
-                  <button className="w-full bg-white text-emerald-600 py-3 rounded-lg font-semibold hover:bg-emerald-50 transition-all duration-300">
-                    Choose Plan
-                  </button>
-                </div>
-                
-                <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-8 text-white">
-                  <h4 className="text-2xl font-bold mb-4">Family Plan</h4>
-                  <p className="text-purple-100 mb-6">Best for families and households</p>
-                  <ul className="space-y-2 text-sm text-purple-100 mb-6">
-                    <li>• Unlimited deliveries</li>
-                    <li>• Express delivery included</li>
-                    <li>• Priority customer support</li>
-                    <li>• Premium product access</li>
-                  </ul>
-                  <button className="w-full bg-white text-purple-600 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-all duration-300">
-                    Choose Plan
-                  </button>
-                </div>
-              </div>
+              {/* Removed the Individual and Family Plan cards section */}
+               
                {/* Add a link to explore stores at the very bottom of the last slide */}
                 <div className="mt-16">
                     <a
