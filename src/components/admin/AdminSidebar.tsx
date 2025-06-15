@@ -13,8 +13,8 @@ const navItems = [
   { href: '/admin/products', label: 'Products', icon: ShoppingBag },
   { href: '/admin/categories', label: 'Categories', icon: ListChecks },
   { href: '/admin/orders', label: 'Orders', icon: PackageCheck },
+  { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/admin/users', label: 'Users', icon: Users }, // Placeholder
   { href: '/admin/settings', label: 'Settings', icon: Settings }, // Placeholder
 ];
 
@@ -56,4 +56,3 @@ export function AdminSidebar() {
     </aside>
   );
 }
-```
