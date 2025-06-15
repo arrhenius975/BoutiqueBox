@@ -4,9 +4,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShoppingBag, BarChart2, Users, Settings, LogOut, Shield, ListChecks, PackageCheck } from 'lucide-react';
+import { Home, ShoppingBag, BarChart2, Users, Settings, LogOut, Shield, ListChecks, PackageCheck, Loader2 } from 'lucide-react'; // Added Loader2
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAppContext } from '@/contexts/AppContext'; // Import useAppContext
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: Home },
@@ -20,6 +21,12 @@ const navItems = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const { signOut, isLoadingAuth } = useAppContext(); // Get signOut and isLoadingAuth
+
+  const handleLogout = async () => {
+    await signOut();
+    // AppContext's signOut will handle redirection
+  };
 
   return (
     <aside className="w-64 bg-slate-800 text-slate-100 p-4 flex flex-col fixed h-full">
@@ -47,9 +54,18 @@ export function AdminSidebar() {
         ))}
       </nav>
       <div className="mt-auto">
-        <Button variant="ghost" className="w-full justify-start gap-3 text-slate-300 hover:bg-slate-700 hover:text-white">
-          <LogOut className="h-5 w-5" />
-          Log Out
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-3 text-slate-300 hover:bg-slate-700 hover:text-white"
+          onClick={handleLogout}
+          disabled={isLoadingAuth} // Disable button if auth is loading
+        >
+          {isLoadingAuth ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            <LogOut className="h-5 w-5" />
+          )}
+          {isLoadingAuth ? 'Logging out...' : 'Log Out'}
         </Button>
          <p className="text-xs text-slate-500 text-center mt-4">&copy; BoutiqueBox Admin</p>
       </div>
