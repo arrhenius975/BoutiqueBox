@@ -256,3 +256,14 @@ export interface SupabaseAddress {
   phone?: string | null; // text
   is_default: boolean; // boolean, default false
 }
+
+// For Admin Settings
+export interface AnnouncementSetting {
+  message: string;
+  enabled: boolean;
+}
+
+export interface AppSettings {
+  announcement_banner?: AnnouncementSetting;
+  // Add other settings here as key-value pairs if needed
+}
