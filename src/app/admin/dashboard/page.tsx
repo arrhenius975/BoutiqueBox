@@ -3,20 +3,19 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2 } from 'lucide-react'; // Added Loader2
+import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from "react";
-import { useToast } from "@/hooks/use-toast"; // Added useToast
-import { format } from 'date-fns'; // For formatting dates
+import { useToast } from "@/hooks/use-toast";
+import { format } from 'date-fns';
 
-// Define types for fetched analytics data
 interface RevenueDataPoint {
-  day: string; // YYYY-MM-DD
+  day: string; 
   revenue: number;
 }
 interface SignupDataPoint {
-  day: string; // YYYY-MM-DD
+  day: string; 
   signup_count: number;
 }
 interface InventoryStatus {
@@ -25,14 +24,27 @@ interface InventoryStatus {
   low_stock_count: number;
 }
 
-// Chart data format
 interface ChartRevenueData {
-  name: string; // e.g., 'Jan 01'
+  name: string; 
   revenue: number;
 }
 interface ChartSignupData {
-  name: string; // e.g., 'Jan 01'
+  name: string; 
   signups: number;
+}
+
+interface DashboardStats {
+  totalRevenue: number;
+  totalOrders: number;
+  activeUsers: number;
+  conversionRate: number;
+}
+
+interface AnalyticsApiResponse {
+  revenue: RevenueDataPoint[];
+  inventory: InventoryStatus[];
+  signups: SignupDataPoint[];
+  stats: DashboardStats;
 }
 
 
@@ -41,11 +53,11 @@ export default function AdminDashboardPage() {
   const [signupChartData, setSignupChartData] = useState<ChartSignupData[]>([]);
   // const [inventorySummary, setInventorySummary] = useState<InventoryStatus[]>([]); // For future use
   
-  const [stats, setStats] = useState({ // These will remain mock for now or be updated by a dedicated stats endpoint
-    totalRevenue: 0, // Will be calculated or fetched
-    totalOrders: 0, // Example, fetch from orders table count
-    activeUsers: 0, // Example, fetch from users table count
-    conversionRate: 0, // Example, calculated
+  const [stats, setStats] = useState<DashboardStats>({
+    totalRevenue: 0,
+    totalOrders: 0,
+    activeUsers: 0,
+    conversionRate: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -59,29 +71,24 @@ export default function AdminDashboardPage() {
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics data.' }));
           throw new Error(errorData.error);
         }
-        const data: { revenue: RevenueDataPoint[], inventory: InventoryStatus[], signups: SignupDataPoint[] } = await response.json();
+        const data: AnalyticsApiResponse = await response.json();
         
-        // Process revenue data for chart
         const processedRevenueData = data.revenue.map(item => ({
-          name: format(new Date(item.day), 'MMM dd'), // Format date for X-axis label
+          name: format(new Date(item.day), 'MMM dd'),
           revenue: item.revenue,
-        })).slice(-30); // Show last 30 days for example
+        })).slice(-30);
         setRevenueChartData(processedRevenueData);
 
-        // Process signup data for chart
         const processedSignupData = data.signups.map(item => ({
-          name: format(new Date(item.day), 'MMM dd'), // Format date for X-axis label
+          name: format(new Date(item.day), 'MMM dd'),
           signups: item.signup_count,
-        })).slice(-30); // Show last 30 days for example
+        })).slice(-30);
         setSignupChartData(processedSignupData);
 
         // setInventorySummary(data.inventory); // Store for future use
+        setStats(data.stats);
 
-        // Calculate total revenue for stats card (example)
-        const totalRev = data.revenue.reduce((sum, item) => sum + item.revenue, 0);
-        setStats(prev => ({ ...prev, totalRevenue: totalRev, /* Update other stats as needed */ }));
-
-        toast({ title: "Analytics Loaded", description: "Dashboard data has been updated." });
+        // toast({ title: "Analytics Loaded", description: "Dashboard data has been updated." }); // Can be a bit noisy
       } catch (error) {
         console.error("Error fetching admin analytics:", error);
         toast({ title: "Analytics Error", description: (error as Error).message, variant: "destructive" });
@@ -96,8 +103,6 @@ export default function AdminDashboardPage() {
   const chartConfig = {
     revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
     signups: { label: "Signups", color: "hsl(var(--chart-2))" },
-    // sales: { label: "Sales", color: "hsl(var(--chart-1))" },
-    // visits: { label: "Visits", color: "hsl(var(--chart-3))" },
   } satisfies Parameters<typeof ChartContainer>[0]["config"];
 
 
@@ -135,7 +140,7 @@ export default function AdminDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.totalOrders.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">(Mock data - implement fetching)</p>
+                <p className="text-xs text-muted-foreground">(All-time)</p>
               </CardContent>
             </Card>
             <Card>
@@ -145,7 +150,7 @@ export default function AdminDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">(Mock data - implement fetching)</p>
+                <p className="text-xs text-muted-foreground">(Signed up in last 30 days)</p>
               </CardContent>
             </Card>
             <Card>
@@ -155,7 +160,7 @@ export default function AdminDashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.conversionRate.toFixed(1)}%</div>
-                <p className="text-xs text-muted-foreground">(Mock data - implement calculation)</p>
+                <p className="text-xs text-muted-foreground">(Orders / Active Users, last 30 days)</p>
               </CardContent>
             </Card>
           </div>
@@ -216,8 +221,9 @@ export default function AdminDashboardPage() {
         </>
       )}
       <p className="text-sm text-muted-foreground text-center">
-        Note: Ensure Supabase views for `revenue_over_time`, `inventory_status`, and `new_signups_over_time` are created and populated for accurate data.
+        Note: Ensure Supabase views for `revenue_over_time`, `inventory_status`, `new_signups_over_time`, `active_users_count_last_30_days`, and `orders_count_last_30_days` are created and populated for accurate data.
       </p>
     </div>
   );
 }
+
