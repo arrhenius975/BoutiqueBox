@@ -1,3 +1,4 @@
+
 // src/app/help/page.tsx
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,21 +71,21 @@ export default function HelpPage() {
             </CardContent>
             <CardFooter>
               <Button asChild className="w-full">
-                <Link href="mailto:support@boutiquebox.com">Send Email</Link>
+                <a href="mailto:boutiquebox788@gmail.com">Email Us</a>
               </Button>
             </CardFooter>
           </Card>
           <Card className="text-center">
             <CardHeader>
               <Phone className="h-12 w-12 mx-auto text-primary mb-2" />
-              <CardTitle>Phone Support (Soon)</CardTitle>
+              <CardTitle>Phone Support</CardTitle>
             </CardHeader>
             <CardContent>
-              <CardDescription>Call us at (555) 123-4567 during business hours.</CardDescription>
+              <CardDescription>Call us at +91-888-XXX-XXXX during business hours.</CardDescription>
             </CardContent>
             <CardFooter>
-               <Button asChild className="w-full" variant="outline" disabled>
-                <Link href="tel:+15551234567">Call Us</Link>
+               <Button asChild className="w-full">
+                <a href="tel:+918880000000">Call Us</a>
               </Button>
             </CardFooter>
           </Card>
