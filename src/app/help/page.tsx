@@ -1,4 +1,3 @@
-
 // src/app/help/page.tsx
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +33,7 @@ export default function HelpPage() {
           <AccordionItem value="item-3">
             <AccordionTrigger>How can I change my delivery address?</AccordionTrigger>
             <AccordionContent>
-              You can change your delivery address in your 'Account Settings' before an order is processed. If an order is already placed, please contact support immediately.
+              You can change your delivery address in your 'Account Settings' before an order is processed. If an order is already placed, please contact support immediately. (Address management coming soon!)
             </AccordionContent>
           </AccordionItem>
            <AccordionItem value="item-4">
@@ -52,13 +51,13 @@ export default function HelpPage() {
           <Card className="text-center">
             <CardHeader>
               <LifeBuoy className="h-12 w-12 mx-auto text-primary mb-2" />
-              <CardTitle>Live Chat</CardTitle>
+              <CardTitle>Live Chat (Soon)</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>Chat with our support team for quick assistance.</CardDescription>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" variant="outline">Start Chat</Button>
+              <Button className="w-full" variant="outline" disabled>Start Chat</Button>
             </CardFooter>
           </Card>
           <Card className="text-center">
@@ -78,13 +77,13 @@ export default function HelpPage() {
           <Card className="text-center">
             <CardHeader>
               <Phone className="h-12 w-12 mx-auto text-primary mb-2" />
-              <CardTitle>Phone Support</CardTitle>
+              <CardTitle>Phone Support (Soon)</CardTitle>
             </CardHeader>
             <CardContent>
               <CardDescription>Call us at (555) 123-4567 during business hours.</CardDescription>
             </CardContent>
             <CardFooter>
-               <Button asChild className="w-full" variant="outline">
+               <Button asChild className="w-full" variant="outline" disabled>
                 <Link href="tel:+15551234567">Call Us</Link>
               </Button>
             </CardFooter>

@@ -1,16 +1,16 @@
-
 // src/app/settings/page.tsx
 "use client";
 
-import React, { useState } from 'react'; // Ensure React is imported for useState if used locally, or for JSX
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bell, Palette, ShieldAlert, Trash2, Languages, Sun, Moon, Laptop, Loader2 } from "lucide-react";
+import { Bell, Palette, ShieldAlert, Trash2, Languages, Sun, Moon, Laptop, KeyRound, Save, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { useAppContext } from '@/contexts/AppContext'; // Import useAppContext
+import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -25,21 +25,25 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function SettingsPage() {
-  const { theme, setTheme, signOut, authUser } = useAppContext(); // Use theme from context
+  const { theme, setTheme, signOut, authUser } = useAppContext();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Placeholder state for notifications and language
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const [notifications, setNotifications] = React.useState({
     email: true,
     push: false,
     sms: false,
   });
-  // const [theme, setTheme] = React.useState("system"); // system, light, dark // Replaced by context
   const [language, setLanguage] = React.useState("en");
 
   const handleNotificationChange = (type: keyof typeof notifications, value: boolean) => {
     setNotifications(prev => ({ ...prev, [type]: value }));
+    // In a real app, you'd save this preference to the backend.
+    toast({ title: "Notification settings are local for now."});
   };
 
   const handleDeleteAccount = async () => {
@@ -48,7 +52,7 @@ export default function SettingsPage() {
         return;
     }
     setIsDeleting(true);
-    const loadingToastId = toast({ title: "Deleting account...", description: "Please wait.", duration: Infinity }).id;
+    const loadingToastId = toast({ title: "Deleting account data...", description: "Please wait.", duration: Infinity }).id;
 
     try {
         const response = await fetch('/api/account/delete', {
@@ -61,8 +65,7 @@ export default function SettingsPage() {
         }
 
         toast({ title: "Account Data Removed", description: "Your personal data has been removed. You are now being logged out." });
-        await signOut(); // This will also trigger redirection via AppContext's auth listener
-        // No explicit router.push('/') needed if signOut handles it.
+        await signOut(); 
     } catch (error) {
         console.error("Account deletion error:", error);
         toast({ title: "Deletion Failed", description: (error as Error).message, variant: "destructive" });
@@ -72,6 +75,48 @@ export default function SettingsPage() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authUser) {
+      toast({ title: "Authentication Error", description: "Please log in to change your password.", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast({ title: "Passwords Do Not Match", description: "Please ensure your new password and confirmation match.", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: "Password Too Short", description: "New password must be at least 6 characters long.", variant: "destructive" });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    const loadingToastId = toast({ title: "Changing password...", description: "Please wait.", duration: Infinity }).id;
+
+    try {
+      const response = await fetch('/api/account/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to change password.");
+      }
+
+      toast({ title: "Password Changed!", description: "Your password has been successfully updated." });
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (error) {
+      console.error("Change password error:", error);
+      toast({ title: "Password Change Failed", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      if(loadingToastId) toast.dismiss(loadingToastId);
+      setIsChangingPassword(false);
+    }
+  };
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -89,7 +134,6 @@ export default function SettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <Label htmlFor="theme-select" className="flex items-center gap-2">
-                {/* Dynamically display icon based on context theme */}
                 {theme === 'light' ? <Sun className="h-5 w-5" /> : theme === 'dark' ? <Moon className="h-5 w-5" /> : <Laptop className="h-5 w-5" />}
                 Theme
               </Label>
@@ -110,14 +154,14 @@ export default function SettingsPage() {
              <Separator />
             <div className="flex items-center justify-between">
               <Label htmlFor="language-select" className="flex items-center gap-2"><Languages className="h-5 w-5" /> Language</Label>
-              <Select value={language} onValueChange={setLanguage}>
+              <Select value={language} onValueChange={setLanguage} disabled>
                 <SelectTrigger id="language-select" className="w-[180px]">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español (Soon)</SelectItem>
-                  <SelectItem value="fr">Français (Soon)</SelectItem>
+                  <SelectItem value="es" disabled>Español (Soon)</SelectItem>
+                  <SelectItem value="fr" disabled>Français (Soon)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -128,7 +172,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Bell className="h-5 w-5" /> Notifications</CardTitle>
-            <CardDescription>Manage how you receive notifications.</CardDescription>
+            <CardDescription>Manage how you receive notifications. (Currently local only)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
@@ -145,7 +189,7 @@ export default function SettingsPage() {
                 id="push-notifications"
                 checked={notifications.push}
                 onCheckedChange={(value) => handleNotificationChange('push', value)}
-                disabled // Placeholder
+                disabled 
               />
             </div>
             <div className="flex items-center justify-between">
@@ -154,29 +198,59 @@ export default function SettingsPage() {
                 id="sms-notifications"
                 checked={notifications.sms}
                 onCheckedChange={(value) => handleNotificationChange('sms', value)}
-                disabled // Placeholder
+                disabled 
               />
             </div>
           </CardContent>
         </Card>
 
-        {/* Privacy Settings */}
+        {/* Security Settings */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Privacy & Security</CardTitle>
-            <CardDescription>Control your privacy and account security settings.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><ShieldAlert className="h-5 w-5" /> Security</CardTitle>
+            <CardDescription>Manage your account security settings.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-start gap-2" disabled>
-              Manage Data Sharing (Soon)
+          <form onSubmit={handleChangePassword}>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input 
+                  id="new-password" 
+                  type="password" 
+                  placeholder="•••••••• (min. 6 characters)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={isChangingPassword || !authUser}
+                  minLength={6}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                <Input 
+                  id="confirm-new-password" 
+                  type="password" 
+                  placeholder="••••••••"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  disabled={isChangingPassword || !authUser}
+                  minLength={6}
+                  required
+                />
+              </div>
+               <Button type="submit" disabled={isChangingPassword || !authUser || !newPassword || !confirmNewPassword}>
+                {isChangingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <KeyRound className="mr-2 h-4 w-4" /> Change Password
+              </Button>
+              <Separator className="my-4" />
+              <Button variant="outline" className="w-full justify-start gap-2" disabled>
+                Two-Factor Authentication (Soon)
+              </Button>
+              <Button variant="outline" className="w-full justify-start gap-2" disabled>
+                Manage Data Sharing (Soon)
             </Button>
-            <Button variant="outline" className="w-full justify-start gap-2" disabled>
-              Change Password (Soon)
-            </Button>
-             <Button variant="outline" className="w-full justify-start gap-2" disabled>
-              Two-Factor Authentication (Soon)
-            </Button>
-          </CardContent>
+            </CardContent>
+          </form>
         </Card>
         
         {/* Account Deletion */}
@@ -226,4 +300,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

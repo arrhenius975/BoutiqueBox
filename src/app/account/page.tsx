@@ -1,4 +1,3 @@
-
 // src/app/account/page.tsx
 "use client";
 
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud, Save } from "lucide-react"; // Added Save
+import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud, Save, KeyRound } from "lucide-react"; // Added Save, KeyRound
 import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
@@ -21,13 +20,11 @@ export default function AccountPage() {
   const { toast } = useToast();
   
   const [localAvatarPreviewUrl, setLocalAvatarPreviewUrl] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false); // Specifically for avatar part of update
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // State for editable profile fields
   const [editableName, setEditableName] = useState('');
-  // const [editablePhone, setEditablePhone] = useState(''); // For future use
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false); // General profile update loading
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   useEffect(() => {
     if (!isLoadingAuth && !authUser) {
@@ -38,7 +35,6 @@ export default function AccountPage() {
   useEffect(() => {
     if (userProfile) {
       setEditableName(userProfile.name || '');
-      // setEditablePhone(userProfile.phone || ''); // If phone field exists in SupabaseUser type
       setLocalAvatarPreviewUrl(userProfile.avatar_url || null);
     }
   }, [userProfile]);
@@ -49,14 +45,11 @@ export default function AccountPage() {
       return;
     }
     const file = event.target.files[0];
-    // The actual upload will happen as part of handleProfileUpdate
-    // For now, just set the preview and the file to be uploaded.
     const reader = new FileReader();
     reader.onloadend = () => {
       setLocalAvatarPreviewUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
-    // No direct upload here, fileInputRef.current will hold the file for handleProfileUpdate
   };
 
   const handleProfileUpdate = async (event: React.FormEvent) => {
@@ -71,20 +64,19 @@ export default function AccountPage() {
 
     const formData = new FormData();
     formData.append('name', editableName);
-    // formData.append('phone', editablePhone); // For future
 
     const avatarFile = fileInputRef.current?.files?.[0];
     if (avatarFile) {
-        if (avatarFile.size > 2 * 1024 * 1024) { // 2MB limit
+        if (avatarFile.size > 2 * 1024 * 1024) { 
             toast({ title: "Avatar Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
             if (fileInputRef.current) fileInputRef.current.value = "";
+            setLocalAvatarPreviewUrl(userProfile.avatar_url || null); // Revert preview if too large
             setIsUpdatingProfile(false);
             if(loadingToastId) toast.dismiss(loadingToastId);
             return;
         }
         formData.append('avatar', avatarFile);
     }
-
 
     try {
       const response = await fetch('/api/profile', {
@@ -100,10 +92,10 @@ export default function AccountPage() {
       const result = await response.json();
 
       if (result.success) {
-        const updatedFields: Partial<typeof userProfile> = { name: editableName };
+        const updatedFields: Partial<typeof userProfile> = { name: result.name || editableName };
         if (result.avatarUrl) {
             updatedFields.avatar_url = result.avatarUrl;
-            setLocalAvatarPreviewUrl(result.avatarUrl); // Update local preview if avatar changed
+            setLocalAvatarPreviewUrl(result.avatarUrl); 
         }
         
         if (setUserProfile && userProfile) {
@@ -117,10 +109,13 @@ export default function AccountPage() {
     } catch (error) {
       console.error('Profile Update Error:', error);
       toast({ title: 'Profile Update Failed', description: (error as Error).message, variant: 'destructive' });
+      // Revert local name and avatar preview if API call fails
+      setEditableName(userProfile.name || '');
+      setLocalAvatarPreviewUrl(userProfile.avatar_url || null);
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsUpdatingProfile(false);
-      if (fileInputRef.current) { // Clear file input after attempt
+      if (fileInputRef.current) { 
         fileInputRef.current.value = "";
       }
     }
@@ -171,7 +166,6 @@ export default function AccountPage() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Profile Card and Logout */}
         <div className="md:col-span-1 space-y-6">
           <Card>
             <CardHeader className="items-center text-center">
@@ -186,7 +180,7 @@ export default function AccountPage() {
                   className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-background group-hover:opacity-100 opacity-70 transition-opacity"
                   onClick={() => fileInputRef.current?.click()}
                   title="Change Profile Picture"
-                  disabled={isUpdatingProfile} // Disabled during any profile update
+                  disabled={isUpdatingProfile} 
                 >
                   {isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                 </Button>
@@ -214,7 +208,6 @@ export default function AccountPage() {
           </Button>
         </div>
 
-        {/* Right Column: Personal Info and Account Options */}
         <form onSubmit={handleProfileUpdate} className="md:col-span-2 space-y-8">
           <Card>
             <CardHeader>
@@ -238,16 +231,17 @@ export default function AccountPage() {
               <div>
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
                 <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" disabled />
+                 <p className="text-xs text-muted-foreground mt-1">Phone number update coming soon.</p>
               </div>
                <Button type="submit" disabled={isUpdatingProfile || (editableName === (userProfile.name || '') && !fileInputRef.current?.files?.[0])}>
                  {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                 <Save className="mr-2 h-4 w-4" /> Save Changes
+                 <Save className="mr-2 h-4 w-4" /> Save Personal Info
                 </Button>
             </CardContent>
           </Card>
         </form>
 
-        <div className="md:col-span-2 space-y-8 mt-[-2rem] md:mt-0"> {/* Adjust margin for layout if needed */}
+        <div className="md:col-span-2 space-y-8 mt-[-2rem] md:mt-0">
           <Card>
             <CardHeader>
               <CardTitle>Account Options</CardTitle>
@@ -255,11 +249,12 @@ export default function AccountPage() {
             <CardContent className="space-y-1">
               {[
                 { label: "Order History", icon: ShoppingBasket, href: "/account/orders" },
+                { label: "Change Password", icon: KeyRound, href: "/settings" }, // Direct to settings for password change
                 { label: "Saved Addresses", icon: MapPin, href: "#", disabled: true },
                 { label: "Payment Methods", icon: CreditCard, href: "#", disabled: true },
                 { label: "Notification Preferences", icon: Bell, href: "/settings" },
                 { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context (Not Implemented as page)"), disabled: true },
-                { label: "Security & Password", icon: ShieldCheck, href: "#", disabled: true },
+                { label: "Security & Privacy", icon: ShieldCheck, href: "/settings" }, // General security to settings
                 { label: "Help & Support", icon: MessageSquareQuote, href: "/help" },
               ].map(item => (
                 <React.Fragment key={item.label}>
@@ -288,6 +283,3 @@ export default function AccountPage() {
     </div>
   );
 }
-    
-
-    
