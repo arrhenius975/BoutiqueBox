@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
   }, [fetchUsers]);
 
   const handleEditUser = (userId: string) => {
-    toast({ title: "Edit User", description: `Edit functionality for user ${userId} coming soon!`, variant: "default" });
+    toast({ title: "Edit User", description: `Edit functionality for user ${userId} coming soon! User roles are managed via Supabase for now.`, variant: "default" });
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -65,13 +65,13 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">User Management</h1>
-        <p className="text-muted-foreground">View and manage user accounts.</p>
+        <p className="text-muted-foreground">View and manage user accounts. Advanced management (edit roles, delete) is coming soon.</p>
       </header>
 
       <Card>
         <CardHeader>
           <CardTitle>All Users</CardTitle>
-          <CardDescription>A list of all registered users in the system.</CardDescription>
+          <CardDescription>A list of all registered users in the system. User roles are managed directly in Supabase.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
