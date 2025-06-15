@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud } from "lucide-react";
+import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud, Save } from "lucide-react"; // Added Save
 import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
@@ -19,46 +19,72 @@ export default function AccountPage() {
   const { authUser, userProfile, isLoadingAuth, signOut, setUserProfile } = useAppContext();
   const router = useRouter();
   const { toast } = useToast();
+  
   const [localAvatarPreviewUrl, setLocalAvatarPreviewUrl] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false); // Specifically for avatar part of update
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State for editable profile fields
+  const [editableName, setEditableName] = useState('');
+  // const [editablePhone, setEditablePhone] = useState(''); // For future use
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false); // General profile update loading
 
   useEffect(() => {
     if (!isLoadingAuth && !authUser) {
-      router.push('/signin'); // Corrected path from /auth/signin
+      router.push('/signin');
     }
   }, [authUser, isLoadingAuth, router]);
 
   useEffect(() => {
-    if (userProfile?.avatar_url) {
-      setLocalAvatarPreviewUrl(userProfile.avatar_url);
-    } else if (userProfile) {
-        setLocalAvatarPreviewUrl(null); // Explicitly set to null if no avatar_url in profile
+    if (userProfile) {
+      setEditableName(userProfile.name || '');
+      // setEditablePhone(userProfile.phone || ''); // If phone field exists in SupabaseUser type
+      setLocalAvatarPreviewUrl(userProfile.avatar_url || null);
     }
   }, [userProfile]);
 
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
     }
-    if (!authUser) {
-      toast({ title: "Authentication Error", description: "You must be logged in to upload an avatar.", variant: "destructive" });
+    const file = event.target.files[0];
+    // The actual upload will happen as part of handleProfileUpdate
+    // For now, just set the preview and the file to be uploaded.
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLocalAvatarPreviewUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+    // No direct upload here, fileInputRef.current will hold the file for handleProfileUpdate
+  };
+
+  const handleProfileUpdate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!authUser || !userProfile) {
+      toast({ title: "Authentication Error", description: "You must be logged in.", variant: "destructive" });
       return;
     }
 
-    const file = event.target.files[0];
-    if (file.size > 2 * 1024 * 1024) { // 2MB limit for avatars
-       toast({ title: "Avatar Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
-       if (fileInputRef.current) fileInputRef.current.value = ""; // Clear input
-       return;
-    }
-    
-    const formData = new FormData();
-    formData.append('avatar', file);
+    setIsUpdatingProfile(true);
+    const loadingToastId = toast({ title: "Updating profile...", description: "Please wait.", duration: Infinity }).id;
 
-    setIsUploadingAvatar(true);
-    const loadingToastId = toast({ title: "Uploading avatar...", description: "Please wait.", duration: Infinity }).id;
+    const formData = new FormData();
+    formData.append('name', editableName);
+    // formData.append('phone', editablePhone); // For future
+
+    const avatarFile = fileInputRef.current?.files?.[0];
+    if (avatarFile) {
+        if (avatarFile.size > 2 * 1024 * 1024) { // 2MB limit
+            toast({ title: "Avatar Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            setIsUpdatingProfile(false);
+            if(loadingToastId) toast.dismiss(loadingToastId);
+            return;
+        }
+        formData.append('avatar', avatarFile);
+    }
+
 
     try {
       const response = await fetch('/api/profile', {
@@ -67,29 +93,34 @@ export default function AccountPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Server error during avatar upload."}));
-        throw new Error(errorData.error || 'Avatar upload failed. Ensure /api/profile (PUT) is implemented correctly.');
+        const errorData = await response.json().catch(() => ({ error: "Server error during profile update."}));
+        throw new Error(errorData.error || 'Profile update failed.');
       }
 
       const result = await response.json();
 
-      if (result.success && result.avatarUrl) {
-        setLocalAvatarPreviewUrl(result.avatarUrl); // Update local preview immediately
-        if (setUserProfile && userProfile) { // Update context state
-            setUserProfile({...userProfile, avatar_url: result.avatarUrl });
+      if (result.success) {
+        const updatedFields: Partial<typeof userProfile> = { name: editableName };
+        if (result.avatarUrl) {
+            updatedFields.avatar_url = result.avatarUrl;
+            setLocalAvatarPreviewUrl(result.avatarUrl); // Update local preview if avatar changed
         }
-        toast({ title: 'Avatar Uploaded Successfully!', description: 'Your profile picture has been updated.' });
+        
+        if (setUserProfile && userProfile) {
+            setUserProfile(prev => prev ? { ...prev, ...updatedFields } : null);
+        }
+        toast({ title: 'Profile Updated!', description: 'Your profile has been successfully updated.' });
       } else {
-        throw new Error(result.error || 'Failed to get avatar URL from API response.');
+        throw new Error(result.error || 'Failed to update profile due to an API issue.');
       }
 
     } catch (error) {
-      console.error('Avatar Upload Error:', error);
-      toast({ title: 'Avatar Upload Failed', description: (error as Error).message, variant: 'destructive' });
+      console.error('Profile Update Error:', error);
+      toast({ title: 'Profile Update Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
-      setIsUploadingAvatar(false);
-      if (fileInputRef.current) { // Clear file input regardless of success/failure
+      setIsUpdatingProfile(false);
+      if (fileInputRef.current) { // Clear file input after attempt
         fileInputRef.current.value = "";
       }
     }
@@ -125,14 +156,12 @@ export default function AccountPage() {
   const userDisplay = {
     name: userProfile.name || "Valued Customer",
     email: userProfile.email,
-    // Use localAvatarPreviewUrl first for immediate feedback, then context's userProfile.avatar_url, then placeholder
     avatarUrl: localAvatarPreviewUrl || userProfile.avatar_url || `https://placehold.co/100x100.png?text=${(userProfile.name || userProfile.email || 'U').substring(0,1).toUpperCase()}`,
     initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email?.substring(0,2).toUpperCase() || 'U'),
   };
 
   const handleLogout = async () => {
     await signOut();
-    // router.push('/') is handled by AppContext signOut now.
   };
 
   return (
@@ -157,7 +186,7 @@ export default function AccountPage() {
                   className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-background group-hover:opacity-100 opacity-70 transition-opacity"
                   onClick={() => fileInputRef.current?.click()}
                   title="Change Profile Picture"
-                  disabled={isUploadingAvatar}
+                  disabled={isUpdatingProfile} // Disabled during any profile update
                 >
                   {isUploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                 </Button>
@@ -166,39 +195,41 @@ export default function AccountPage() {
                     ref={fileInputRef} 
                     className="hidden" 
                     accept="image/png, image/jpeg, image/gif" 
-                    onChange={handleAvatarUpload}
-                    disabled={isUploadingAvatar}
+                    onChange={handleAvatarFileChange}
+                    disabled={isUpdatingProfile}
                 />
               </div>
-              <CardTitle className="text-2xl">{userDisplay.name}</CardTitle>
-              <CardDescription>{userDisplay.email}</CardDescription>
+              <CardTitle className="text-2xl">{userProfile.name || "Valued Customer"}</CardTitle>
+              <CardDescription>{userProfile.email}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full" disabled>
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Profile Details (Soon)
-              </Button>
                <p className="text-xs text-muted-foreground text-center pt-1">
-                Avatar upload requires backend API at /api/profile (PUT) to be implemented for persistence.
+                Avatar changes apply upon saving personal information.
               </p>
             </CardContent>
           </Card>
-           <Button variant="destructive" className="w-full" onClick={handleLogout} disabled={isLoadingAuth || isUploadingAvatar}>
-             {(isLoadingAuth || isUploadingAvatar) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+           <Button variant="destructive" className="w-full" onClick={handleLogout} disabled={isLoadingAuth || isUpdatingProfile}>
+             {(isLoadingAuth || isUpdatingProfile) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             <LogOut className="mr-2 h-4 w-4" /> Log Out
           </Button>
         </div>
 
         {/* Right Column: Personal Info and Account Options */}
-        <div className="md:col-span-2 space-y-8">
+        <form onSubmit={handleProfileUpdate} className="md:col-span-2 space-y-8">
           <Card>
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Manage your personal details. (Editing disabled for now)</CardDescription>
+              <CardDescription>Manage your personal details.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" defaultValue={userDisplay.name} disabled />
+                <Input 
+                    id="name" 
+                    value={editableName} 
+                    onChange={(e) => setEditableName(e.target.value)} 
+                    disabled={isUpdatingProfile} 
+                />
               </div>
               <div>
                 <Label htmlFor="email">Email Address</Label>
@@ -208,10 +239,15 @@ export default function AccountPage() {
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
                 <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" disabled />
               </div>
-               <Button disabled>Save Changes (Soon)</Button>
+               <Button type="submit" disabled={isUpdatingProfile || (editableName === (userProfile.name || '') && !fileInputRef.current?.files?.[0])}>
+                 {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                 <Save className="mr-2 h-4 w-4" /> Save Changes
+                </Button>
             </CardContent>
           </Card>
+        </form>
 
+        <div className="md:col-span-2 space-y-8 mt-[-2rem] md:mt-0"> {/* Adjust margin for layout if needed */}
           <Card>
             <CardHeader>
               <CardTitle>Account Options</CardTitle>
@@ -240,7 +276,7 @@ export default function AccountPage() {
                       <item.icon className="h-5 w-5 text-primary" />
                       <span>{item.label} {item.disabled ? "(Soon)" : ""}</span>
                     </div>
-                    <Edit3 className="h-4 w-4 text-muted-foreground" /> {/* Replaced ChevronRight with Edit3 for a more "manage" feel */}
+                    <Edit3 className="h-4 w-4 text-muted-foreground" />
                   </Link>
                   <Separator />
                 </React.Fragment>
