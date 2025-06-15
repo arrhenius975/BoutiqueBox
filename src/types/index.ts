@@ -32,6 +32,7 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  stock: number; // Added stock
   image: string; // Typically the primary image URL from SupabaseProductImage
   category: ProductCategory; // Frontend specific sub-category string (e.g., from category_id.name)
   category_id?: number; // Added to hold the actual category ID for convenience
@@ -255,5 +256,3 @@ export interface SupabaseAddress {
   phone?: string | null; // text
   is_default: boolean; // boolean, default false
 }
-
-```

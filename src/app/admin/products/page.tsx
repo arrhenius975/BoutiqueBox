@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2, Package } from 'lucide-react'; // Added Package for stock
 import type { Product, SupabaseCategory as AdminUICategoryType } from '@/types'; // Changed ProductCategory to SupabaseCategory
 import { ProductForm, type ProductFormSubmitData } from './components/ProductForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -53,7 +53,7 @@ export default function AdminProductsPage() {
       setIsLoadingCategories(false);
     }
   }, [toast]);
-  
+
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
@@ -63,13 +63,14 @@ export default function AdminProductsPage() {
         throw new Error(errorData.error || 'Failed to fetch products');
       }
       const data = await response.json();
-      
+
       const formattedProducts: Product[] = data.map((p: any) => {
         return {
           id: p.id,
           name: p.name,
           description: p.description,
-          price: parseFloat(p.price), 
+          price: parseFloat(p.price),
+          stock: p.stock, // Add stock here
           category: p.category_id?.name || 'Uncategorized', // Use category name from join
           category_id: p.category_id?.id, // Store category_id
           image: p.product_images?.find((img: any) => img.is_primary)?.image_url || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
@@ -104,7 +105,7 @@ export default function AdminProductsPage() {
 
   const handleDeleteProduct = async (productId: string) => {
     if (!window.confirm("Are you sure you want to delete this product? This will also remove associated images.")) return;
-    
+
     setIsSubmitting(true);
     const loadingToastId = toast({ title: "Deleting product...", description: "Please wait.", duration: Infinity }).id;
     try {
@@ -115,8 +116,8 @@ export default function AdminProductsPage() {
         const errorData = await response.json().catch(() => ({ error: 'Failed to delete product and parse error response.' }));
         throw new Error(errorData.error || 'Failed to delete product');
       }
-      
-      await fetchProducts(); 
+
+      await fetchProducts();
       toast({ title: "Product Deleted", description: `Product has been removed.` });
     } catch (error) {
       console.error("Delete product error:", error);
@@ -131,17 +132,18 @@ export default function AdminProductsPage() {
     setIsSubmitting(true);
     const isUpdating = !!data.id;
     const actionVerb = isUpdating ? "Updating" : "Adding";
-    const loadingToastId = toast({ 
-        title: `${actionVerb} product...`, 
-        description: "Please wait.", 
-        duration: Infinity 
+    const loadingToastId = toast({
+        title: `${actionVerb} product...`,
+        description: "Please wait.",
+        duration: Infinity
     }).id;
 
     const formData = new FormData();
     formData.append('name', data.name);
     formData.append('description', data.description);
     formData.append('price', data.price);
-    
+    formData.append('stock', data.stock); // Add stock to FormData
+
     // data.category_id is now directly the ID from ProductFormSubmitData
     if (data.category_id) {
       formData.append('category_id', data.category_id.toString());
@@ -152,14 +154,14 @@ export default function AdminProductsPage() {
       return;
     }
     formData.append('brand_id', '1'); // Mocking brand_id, replace with actual brand selection if implemented
-    
+
     if (data.imageFile) {
       formData.append('imageFile', data.imageFile, data.imageFile.name);
     }
     if (isUpdating && data.currentImageUrl && !data.imageFile) {
         formData.append('currentImageUrl', data.currentImageUrl);
     }
-    
+
     formData.append('data_ai_hint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product');
 
     try {
@@ -181,12 +183,12 @@ export default function AdminProductsPage() {
         const errorData = await response.json().catch(() => ({ error: `Server error during product ${isUpdating ? 'update' : 'creation'}.` }));
         throw new Error(errorData.error || `Failed to ${isUpdating ? 'update' : 'add'} product`);
       }
-      
+
       const result = await response.json();
       if (result.success) {
         toast({ title: `Product ${isUpdating ? 'Updated' : 'Added'}`, description: `${data.name} has been successfully ${isUpdating ? 'updated' : 'added'}.` });
-        await fetchProducts(); 
-        setIsFormOpen(false); 
+        await fetchProducts();
+        setIsFormOpen(false);
         setEditingProduct(null);
       } else {
         throw new Error(result.error || `Unknown error from API after ${isUpdating ? 'updating' : 'adding'} product.`);
@@ -208,7 +210,7 @@ export default function AdminProductsPage() {
     const matchesCategory = filterCategoryId === 'all' || product.category_id?.toString() === filterCategoryId;
     return matchesSearch && matchesCategory;
   });
-  
+
   // Prepare categories for the ProductForm dropdown
   const formSelectableCategories = allCategories.map(cat => ({
     value: cat.id, // Use number for value if ProductForm can handle it, otherwise toString()
@@ -224,7 +226,7 @@ export default function AdminProductsPage() {
           <p className="text-muted-foreground">Add, edit, or remove products from your store.</p>
         </div>
         <Button onClick={handleAddProduct} size="lg" disabled={isSubmitting || isLoadingProducts || isLoadingCategories}>
-          {( (isLoadingProducts || isLoadingCategories) && !products.length && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
+          {( (isLoadingProducts || isLoadingCategories) && !products.length && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />}
           Add New Product
         </Button>
       </header>
@@ -247,9 +249,9 @@ export default function AdminProductsPage() {
                 disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
               />
             </div>
-            <Select 
-                value={filterCategoryId} 
-                onValueChange={(value) => setFilterCategoryId(value)} 
+            <Select
+                value={filterCategoryId}
+                onValueChange={(value) => setFilterCategoryId(value)}
                 disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
@@ -277,7 +279,8 @@ export default function AdminProductsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead className="hidden md:table-cell">Category</TableHead>
                 <TableHead>Price</TableHead>
-                <TableHead className="hidden lg:table-cell w-[30%]">Description</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead className="hidden lg:table-cell w-[25%]">Description</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -298,6 +301,13 @@ export default function AdminProductsPage() {
                      {product.category} {/* Display category name */}
                   </TableCell>
                   <TableCell>${product.price.toFixed(2)}</TableCell>
+                  <TableCell>
+                    {/* @ts-ignore */}
+                    <span className={`font-medium ${product.stock <= 5 ? 'text-destructive' : (product.stock <= 20 ? 'text-yellow-600' : 'text-green-600')}`}>
+                        {/* @ts-ignore */}
+                        {product.stock !== undefined ? product.stock : 'N/A'}
+                    </span>
+                  </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground truncate max-w-xs">{product.description}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -312,7 +322,7 @@ export default function AdminProductsPage() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center h-24">
+                  <TableCell colSpan={7} className="text-center h-24">
                     {products.length === 0 ? "No products yet. Click 'Add New Product' to get started!" : "No products found matching your search or filter."}
                   </TableCell>
                 </TableRow>
@@ -324,7 +334,7 @@ export default function AdminProductsPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
-        if (isSubmitting) return; 
+        if (isSubmitting) return;
         setIsFormOpen(isOpen);
         if (!isOpen) setEditingProduct(null);
       }}>

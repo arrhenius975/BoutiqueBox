@@ -13,7 +13,7 @@ async function isAdmin(req: NextRequest): Promise<boolean> {
     .select('role')
     .eq('auth_id', user.id)
     .single();
-  
+
   return !profileError && profile?.role === 'admin';
 }
 
@@ -53,12 +53,12 @@ export async function DELETE(
     if (imagesData && imagesData.length > 0) {
       const imagePathsToDelete: string[] = [];
       for (const img of imagesData) {
-        if (img.image_url && !img.image_url.startsWith('https://placehold.co')) { 
+        if (img.image_url && !img.image_url.startsWith('https://placehold.co')) {
           try {
             const url = new URL(img.image_url);
             const pathSegments = url.pathname.split('/');
-            if (pathSegments.length > 6 && pathSegments[5] === 'product-images') { 
-              imagePathsToDelete.push(pathSegments.slice(6).join('/')); 
+            if (pathSegments.length > 6 && pathSegments[5] === 'product-images') {
+              imagePathsToDelete.push(pathSegments.slice(6).join('/'));
             } else {
                console.warn(`Could not parse path from image URL for deletion: ${img.image_url}`);
             }
@@ -67,17 +67,17 @@ export async function DELETE(
           }
         }
       }
-      
+
       if (imagePathsToDelete.length > 0) {
         const { error: storageDeleteError } = await supabase.storage
-          .from('product-images') 
+          .from('product-images')
           .remove(imagePathsToDelete);
 
         if (storageDeleteError) {
           console.warn(`Error deleting images from storage for product ${id}:`, storageDeleteError.message);
-          return NextResponse.json({ 
-            success: true, 
-            message: `Product deleted from database, but failed to cleanup some images from storage: ${storageDeleteError.message}. Check RLS policies for storage.objects table for DELETE operation.` 
+          return NextResponse.json({
+            success: true,
+            message: `Product deleted from database, but failed to cleanup some images from storage: ${storageDeleteError.message}. Check RLS policies for storage.objects table for DELETE operation.`
           });
         }
       }
@@ -113,23 +113,24 @@ export async function PUT(
     const brand_id_str = formData.get('brand_id') as string | null;
     const dataAiHint = formData.get('data_ai_hint') as string | null;
     const imageFile = formData.get('imageFile') as File | null;
+    const stockStr = formData.get('stock') as string | null; // Get stock as string first
 
-    if (!name || !priceStr || !category_id_str) {
-      return NextResponse.json({ error: 'Missing required fields: name, price, category_id' }, { status: 400 });
+
+    if (!name || !priceStr || !category_id_str || !stockStr) { // Added stockStr to required check
+      return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
 
     const price = parseFloat(priceStr);
     const category_id = parseInt(category_id_str, 10);
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '') ? parseInt(brand_id_str, 10) : null;
-    const stock = formData.get('stock') ? parseInt(formData.get('stock') as string, 10) : 0; 
+    const stock = parseInt(stockStr, 10); // Parse stock
 
-    if (isNaN(price) || isNaN(category_id) || (stockStr && isNaN(stock)) ) {
+    if (isNaN(price) || isNaN(category_id) || isNaN(stock) ) { // Added stock to NaN check
       return NextResponse.json({ error: 'Invalid numeric value for price, category_id, or stock' }, { status: 400 });
     }
      if (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '' && isNaN(brand_id as number)) {
         return NextResponse.json({ error: 'Invalid numeric value for brand_id' }, { status: 400 });
     }
-    const stockStr = formData.get('stock') as string | null; // Get stock as string first
 
 
     const productUpdatePayload: {
@@ -145,14 +146,12 @@ export async function PUT(
       name,
       description: description || undefined,
       price,
+      stock, // Include stock in payload
       category_id,
       brand_id: brand_id,
       data_ai_hint: dataAiHint || name.toLowerCase().split(" ")[0] || "product",
       updated_at: new Date().toISOString(),
     };
-    if (stockStr && !isNaN(parseInt(stockStr))) {
-        productUpdatePayload.stock = parseInt(stockStr);
-    }
 
 
     const { data: updatedProductData, error: productUpdateError } = await supabase
@@ -165,7 +164,7 @@ export async function PUT(
         description,
         price,
         stock,
-        category_id ( id, name ), 
+        category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
@@ -178,7 +177,7 @@ export async function PUT(
     }
 
     let finalImageUrl = updatedProductData.product_images?.find(img => img.is_primary)?.image_url;
-    
+
     if (imageFile && imageFile.size > 0) {
       // Delete old images from storage and product_images table
       const { data: oldImages, error: oldImagesError } = await supabase
@@ -206,7 +205,7 @@ export async function PUT(
           const { error: removeError } = await supabase.storage.from('product-images').remove(oldImageStoragePaths);
           if (removeError) console.warn(`Failed to remove old images from storage for ${productId}: ${removeError.message}`);
         }
-        
+
         const { error: deleteDbImagesError } = await supabase.from('product_images').delete().eq('product_id', productId);
         if (deleteDbImagesError) console.warn(`Failed to delete old image records from DB for ${productId}: ${deleteDbImagesError.message}`);
       }
@@ -217,7 +216,7 @@ export async function PUT(
 
       const { error: uploadErr } = await supabase.storage
         .from('product-images')
-        .upload(newFilePath, imageFile, { upsert: false, contentType: imageFile.type }); 
+        .upload(newFilePath, imageFile, { upsert: false, contentType: imageFile.type });
 
       if (uploadErr) {
         console.error('New image upload error during update:', uploadErr);
@@ -244,7 +243,7 @@ export async function PUT(
         return NextResponse.json({ error: `Product updated, image uploaded, but linking new image in DB failed: ${newProductImageInsertError.message}. Product ID: ${productId}` }, { status: 500 });
       }
     }
-    
+
     // Refetch product data to include the potentially new image URL in the response
     const { data: finalProductData, error: finalProductFetchError } = await supabase
       .from('products')
@@ -254,7 +253,7 @@ export async function PUT(
         description,
         price,
         stock,
-        category_id ( id, name ), 
+        category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint

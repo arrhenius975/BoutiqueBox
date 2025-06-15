@@ -19,6 +19,7 @@ export interface ProductFormSubmitData {
   name: string;
   description: string;
   price: string; // Will be parsed to float by backend
+  stock: string; // Will be parsed to int by backend
   category_id: number | null; // Changed from category string to category_id number
   imageFile: File | null;
   currentImageUrl?: string; // URL of existing image if editing
@@ -29,7 +30,7 @@ interface ProductFormProps {
   product?: Product | null; // Product data if editing
   onSubmit: (data: ProductFormSubmitData) => void;
   onCancel: () => void;
-  availableCategories: { value: number; label: string }[]; 
+  availableCategories: { value: number; label: string }[];
   isSubmitting?: boolean;
 }
 
@@ -38,6 +39,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(''); // Store as string for Select component
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -48,14 +50,17 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       setName(product.name);
       setDescription(product.description);
       setPrice(product.price.toString());
+      // @ts-ignore - product may not have stock property yet if data source is old
+      setStock(product.stock?.toString() || '0');
       setSelectedCategoryId(product.category_id ? product.category_id.toString() : ''); // Use product.category_id
-      setImagePreview(product.image); 
+      setImagePreview(product.image);
       setDataAiHint(product['data-ai-hint'] || product.name.toLowerCase().split(' ')[0] || 'product');
     } else {
       // Reset form for new product
       setName('');
       setDescription('');
       setPrice('');
+      setStock('0');
       setSelectedCategoryId('');
       setImageFile(null);
       setImagePreview(null);
@@ -68,7 +73,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       const file = e.target.files[0];
       if (file.size > 2 * 1024 * 1024) { // 2MB limit
         toast({ title: "Image Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
-        e.target.value = ""; 
+        e.target.value = "";
         return;
       }
       setImageFile(file);
@@ -94,6 +99,10 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
         toast({ title: "Valid Price Required", description: "Please enter a price greater than 0.", variant: "destructive" });
         return;
     }
+    if (!stock.trim() || parseInt(stock) < 0) {
+        toast({ title: "Valid Stock Required", description: "Please enter a stock quantity of 0 or more.", variant: "destructive" });
+        return;
+    }
     if (!product?.id && !imageFile) { // New product requires an image
         toast({ title: "Image Required", description: "Please upload an image for the new product.", variant: "destructive" });
         return;
@@ -104,14 +113,15 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       name,
       description,
       price,
+      stock,
       category_id: parseInt(selectedCategoryId, 10), // Convert string ID back to number
       imageFile,
       currentImageUrl: product?.image,
       'data-ai-hint': dataAiHint || name.toLowerCase().split(' ')[0] || 'product',
     });
   };
-  
-  const isFormValid = name.trim() && price.trim() && parseFloat(price) > 0 && selectedCategoryId && (product?.id || imageFile);
+
+  const isFormValid = name.trim() && price.trim() && parseFloat(price) > 0 && stock.trim() && parseInt(stock) >=0 && selectedCategoryId && (product?.id || imageFile);
 
 
   return (
@@ -132,15 +142,19 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} disabled={isSubmitting} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <Label htmlFor="price">Price ($) <span className="text-destructive">*</span></Label>
               <Input id="price" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required disabled={isSubmitting} min="0.01" />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="stock">Stock Qty <span className="text-destructive">*</span></Label>
+              <Input id="stock" type="number" step="1" value={stock} onChange={(e) => setStock(e.target.value)} required disabled={isSubmitting} min="0" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
-              <Select 
-                value={selectedCategoryId} 
+              <Select
+                value={selectedCategoryId}
                 onValueChange={(value) => setSelectedCategoryId(value)}
                 disabled={isSubmitting || availableCategories.length === 0}
                 required
@@ -173,8 +187,8 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
                         variant="destructive"
                         size="icon"
                         className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 z-10"
-                        onClick={() => { 
-                            setImageFile(null); 
+                        onClick={() => {
+                            setImageFile(null);
                             setImagePreview(product?.id ? product.image : null);
                             const fileInput = document.getElementById('image-upload') as HTMLInputElement;
                             if (fileInput) fileInput.value = "";

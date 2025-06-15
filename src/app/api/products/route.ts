@@ -12,13 +12,13 @@ export async function POST(req: NextRequest) {
     const stockStr = formData.get('stock') as string | null; // Stock might not always be provided
     const category_id_str = formData.get('category_id') as string;
     const brand_id_str = formData.get('brand_id') as string | null; // Brand ID might be optional
-    const dataAiHint = formData.get('dataAiHint') as string | null;
+    const dataAiHint = formData.get('data_ai_hint') as string | null; // Changed from dataAiHint to data_ai_hint
 
     const imageFile = formData.get('imageFile') as File | null;
 
     // Validate required fields
-    if (!name || !priceStr || !category_id_str) {
-        return NextResponse.json({ error: 'Missing required fields: name, price, category_id' }, { status: 400 });
+    if (!name || !priceStr || !category_id_str || !stockStr) { // Added stockStr to required
+        return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
      // Image file is required for new product if provided
     if (imageFile && imageFile.size === 0) {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     const price = parseFloat(priceStr);
     // Default stock to 0 if not provided or invalid, but ensure it's a number
-    const stock = stockStr ? parseInt(stockStr, 10) : 0; 
+    const stock = parseInt(stockStr, 10);
     const category_id = parseInt(category_id_str, 10);
     // brand_id can be null if not provided or if the string is 'null' or empty
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '') ? parseInt(brand_id_str, 10) : null;
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         brand_id: brand_id,
         data_ai_hint: dataAiHint || name.toLowerCase().split(" ")[0] || "product"
     };
-    
+
     const { data: productData, error: productInsertError } = await supabase
       .from('products')
       .insert([productInsertPayload])
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         const { data: urlData } = supabase.storage
             .from('product-images')
             .getPublicUrl(filePath);
-        
+
         if (!urlData || !urlData.publicUrl) {
             console.error('Failed to get public URL for uploaded image:', filePath);
             return NextResponse.json({ error: `Product created, image uploaded, but failed to retrieve public URL. Product ID: ${productData.id}` }, { status: 500 });
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         // If no image file was provided, still insert a placeholder into product_images for consistency
          const { error: placeholderImageInsertError } = await supabase.from('product_images').insert({
             product_id: productData.id,
-            image_url: publicUrl, 
+            image_url: publicUrl,
             is_primary: true
         });
          if (placeholderImageInsertError) {
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
         description,
         price,
         stock,
-        category_id ( id, name ), 
+        category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
       console.error('GET /api/products error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    
+
     return NextResponse.json(data);
 
   } catch (e: unknown) {
@@ -162,5 +162,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
-    
