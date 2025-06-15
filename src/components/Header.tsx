@@ -93,11 +93,12 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 100;
-  const yOffsetForArc = 5;
-  const angleSpan = numCategories > 1 ? 180 : 0;
+  // Arc parameters - adjusted for new visual alignment
+  const categoryArcRadius = 50; // Shallower arc
+  const yOffsetForArc = -10;    // Shift arc upwards
+  const angleSpan = numCategories > 1 ? 180 : 0; // Keep 180-degree span for semicircle
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
-  const iconPixelWidth = 48;
+  const iconPixelWidth = 48; // Assuming average button width for positioning calculations
 
 
   return (
@@ -286,9 +287,10 @@ export function Header() {
         </div>
       </div>
 
+      {/* Container for the category arc */}
       {currentSection && categoriesList.length > 0 && (
-         <div className="relative h-36 md:h-40 mt-2 flex justify-center items-start">
-          <div className="relative w-[280px] h-[140px] sm:w-[360px] sm:h-[140px] md:w-[420px] md:h-[140px]">
+         <div className="relative h-[50px] flex justify-center items-start"> {/* Outer container: Reduced height, no mt */}
+          <div className="relative w-[280px] h-[110px] sm:w-[360px] sm:h-[110px] md:w-[420px] md:h-[110px]"> {/* Inner positioning context: Adjusted height */}
             {categoriesList.map((category, index) => {
               const angle = numCategories > 1 ? startAngle + (index / (numCategories - 1)) * angleSpan : 0;
               const radian = angle * (Math.PI / 180);
@@ -313,7 +315,7 @@ export function Header() {
                   )}
                   style={{
                     left: `calc(50% + ${x}px - ${iconPixelWidth / 2}px)`,
-                    top: `${y}px`,
+                    top: `${y}px`, // y positions icons within the h-[110px] inner div
                     transform: `rotate(${angle}deg)`,
                   }}
                   title={category.label}
@@ -332,3 +334,5 @@ export function Header() {
     </header>
   );
 }
+
+    
