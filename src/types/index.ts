@@ -82,7 +82,7 @@ export type SearchFilterType = 'all' | 'name' | 'description';
 export interface DisplayOrder {
   id: string;
   date: string;
-  status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | string;
+  status: 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'pending' | 'paid' | string; // Expanded for admin
   totalAmount: number;
   items: Array<{
     id: string; // Product ID
@@ -92,6 +92,11 @@ export interface DisplayOrder {
     image: string;
     'data-ai-hint': string;
   }>;
+  user?: { // Optional user info for admin view
+    id: string;
+    name?: string | null;
+    email: string;
+  };
 }
 
 
@@ -176,6 +181,7 @@ export interface SupabaseOrder {
   total_amount?: number | null; // numeric(10, 2)
   status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | string; // text, default 'pending'
   created_at: string; // timestamp
+  updated_at?: string; // Added for tracking updates
 }
 
 export interface SupabaseOrderItem {
@@ -249,3 +255,5 @@ export interface SupabaseAddress {
   phone?: string | null; // text
   is_default: boolean; // boolean, default false
 }
+
+```
