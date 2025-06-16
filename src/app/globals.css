@@ -29,6 +29,16 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Added Sidebar Theme Variables */
+    --sidebar-background: 220 13% 18%; /* Example: Dark slate for default theme */
+    --sidebar-foreground: 210 20% 90%; /* Example: Light gray */
+    --sidebar-primary: 260 80% 60%; /* Example: Purple */
+    --sidebar-primary-foreground: 0 0% 100%; /* Example: White */
+    --sidebar-accent: 220 13% 25%; /* Example: Darker slate for accent */
+    --sidebar-accent-foreground: 210 20% 90%; /* Example: Light gray for accent text */
+    --sidebar-border: 220 13% 30%; /* Example: Slightly lighter border */
+    --sidebar-ring: 260 80% 70%; /* Example: Lighter purple for ring */
   }
 
   .dark {
@@ -56,6 +66,17 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Added Sidebar Theme Variables for Dark Mode */
+    /* These can be the same as :root or adjusted if sidebar needs a different dark theme */
+    --sidebar-background: 220 13% 18%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 260 80% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 25%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 220 13% 30%;
+    --sidebar-ring: 260 80% 70%;
   }
 }
 
