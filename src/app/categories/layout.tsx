@@ -1,15 +1,9 @@
-// src/app/categories/layout.tsx
-import type { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'Explore Categories - BoutiqueBox',
-  description: 'Discover various collections at BoutiqueBox.',
-};
-
-export default function CategoriesLayout({
+// This layout is no longer used as src/app/categories/page.tsx has been deprecated.
+export default function DeprecatedCategoriesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>; // The page itself includes StickyHeader and Footer
+  return <>{children}</>;
 }

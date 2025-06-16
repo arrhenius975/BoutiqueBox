@@ -64,7 +64,7 @@ const BoutiqueBoxLanding = () => {
       container.addEventListener('wheel', handleWheel, { passive: false } as EventListenerOptions);
       return () => container.removeEventListener('wheel', handleWheel, { passive: false } as EventListenerOptions);
     }
-  }, [currentSlide, slides.length]); // Added slides.length
+  }, [currentSlide, slides.length]); 
 
   const nextSlide = () => {
     if (isScrolling.current) return;
@@ -117,7 +117,7 @@ const BoutiqueBoxLanding = () => {
             Experience premium products and personalized service that transforms your everyday routine 
             into something extraordinary.
           </p>
-          <Link href="/categories" passHref>
+          <Link href="/sections" passHref>
             <button 
               className="bg-white text-green-900 px-8 py-4 rounded-full font-semibold text-lg hover:bg-emerald-50 transition-all duration-300 transform hover:scale-105 shadow-2xl"
             >
@@ -293,7 +293,7 @@ const BoutiqueBoxLanding = () => {
               </p>
               
                 <div className="mt-16">
-                  <Link href="/categories" passHref>
+                  <Link href="/sections" passHref>
                     <button
                         className="inline-block bg-white text-gray-900 px-10 py-5 rounded-full font-bold text-xl hover:bg-gray-200 transition-all duration-300 transform hover:scale-105 shadow-2xl"
                     >
@@ -400,7 +400,7 @@ const BoutiqueBoxLanding = () => {
       </div>
 
       <Link
-        href="/categories"
+        href="/sections"
         className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center group"
       >
         <ShoppingBag className="h-6 w-6" />

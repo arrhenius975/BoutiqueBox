@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const desktopNavItems = [
-  { href: '/sections', label: 'Categories', icon: Layers },
+  { href: '/sections', label: 'Stores', icon: Layers }, // Changed "Categories" to "Stores"
   { href: '/account', label: 'Account', icon: User },
   { href: '/help', label: 'Help', icon: HelpCircle },
   { href: '/settings', label: 'Settings', icon: SettingsIcon },
@@ -45,7 +45,7 @@ export function Header() {
     searchFilterType,
     setSearchFilterType,
     authUser,
-    userProfile, // Added userProfile here
+    userProfile, 
     isLoadingAuth,
   } = useAppContext();
   const pathname = usePathname();
@@ -67,15 +67,14 @@ export function Header() {
                            pathname.startsWith('/grocery') ||
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood') ||
-                           pathname.startsWith('/category/');
+                           pathname.startsWith('/category/'); // Kept for product detail under a category if any
   
   const isProductDetailPage = 
-    pathname.split('/').length >= 3 && // e.g., /grocery/product-id or /category/cat-id/product-id
+    pathname.split('/').length >= 3 && 
     (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || (pathname.startsWith('/category/') && pathname.split('/').length > 3) );
 
 
   useEffect(() => {
-    // AppContext handles resetting search term based on path changes logic
   }, [pathname, setSearchTerm]);
 
   useEffect(() => {
@@ -107,7 +106,7 @@ export function Header() {
   const startAngle = numCategories > 1 ? -angleSpan / 2 : (numCategories === 1 ? 0 : 0);
   const iconPixelWidth = 40; 
 
-  const showCategoryArc = currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/') && !isProductDetailPage;
+  const showCategoryArc = currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/') && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood'));
 
   return (
     <header
@@ -130,7 +129,7 @@ export function Header() {
             </Button>
           ) : null}
           <Link
-            href={sectionPath}
+            href={sectionPath} // This now defaults to /sections if no currentSectionConfig
             className={cn(
               "flex items-center gap-2",
               currentSectionConfig ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
@@ -139,7 +138,7 @@ export function Header() {
             <ShoppingBag className="h-7 w-7" />
             <span className="font-headline text-xl md:text-2xl font-bold">{sectionName}</span>
           </Link>
-          {currentSectionConfig && !isProductDetailPage && (
+          {currentSectionConfig && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood')) && (
             <div className="hidden md:flex items-center gap-1 text-sm opacity-80">
               <MapPin className="h-4 w-4" />
               <span>Delivering to: CA, USA</span>
@@ -147,13 +146,13 @@ export function Header() {
           )}
         </div>
 
-        {isAppFeaturePage && !isProductDetailPage && (
+        {isAppFeaturePage && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood') || pathname === '/sections') && (
           <div className="flex-1 min-w-0 px-2 md:px-4">
             <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto flex items-center">
               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input
                 type="search"
-                placeholder="Search products..."
+                placeholder={pathname === '/sections' ? "Search stores..." : "Search products..."}
                 className={cn(
                   "w-full rounded-lg bg-transparent py-2 pl-8 h-9 text-sm",
                   currentSectionConfig
@@ -163,7 +162,7 @@ export function Header() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {(currentSectionConfig || pathname.startsWith('/category/')) && (
+              {(currentSectionConfig || pathname.startsWith('/category/')) && !pathname.startsWith('/sections') && ( // Hide filter on /sections
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -199,7 +198,7 @@ export function Header() {
         )}>
           <nav className="hidden md:flex items-center gap-x-3 lg:gap-x-4">
             {desktopNavItems.map((item) => {
-              const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
+              const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/sections');
               const ItemIcon = item.icon;
               return (
                 <Link
@@ -217,7 +216,6 @@ export function Header() {
                 </Link>
               );
             })}
-             {/* Conditionally render Admin Panel link */}
             {authUser && userProfile && userProfile.role === 'admin' && (
               <Link
                 href="/admin/dashboard"
@@ -238,7 +236,7 @@ export function Header() {
 
 
           <div className="flex items-center gap-x-0.5 sm:gap-x-1">
-            {(currentSectionConfig || pathname.startsWith('/category/')) && !isProductDetailPage && (
+            {(currentSectionConfig || pathname.startsWith('/category/')) && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood')) && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -360,4 +358,3 @@ export function Header() {
     </header>
   );
 }
-
