@@ -25,8 +25,8 @@ export async function GET(
         description,
         price,
         stock,
-        category_id, 
-        categories ( name ), 
+        category_id,
+        categories ( name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
@@ -47,7 +47,7 @@ export async function GET(
       price: parseFloat(p.price),
       stock: p.stock || 0,
       // @ts-ignore - category_id is directly on p, categories table is joined for name
-      category: p.categories?.name || 'Unknown Category', 
+      category: p.categories?.name || 'Unknown Category',
       category_id: p.category_id, // Keep the actual category_id
       image: p.product_images?.find((img: any) => img.is_primary)?.image_url || \`https://placehold.co/300x200.png?text=\${encodeURIComponent(p.name.substring(0,2))}\`,
       'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'product',
