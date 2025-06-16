@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const desktopNavItems = [
-  { href: '/sections', label: 'Categories', icon: Layers }, // Changed "Stores" to "Categories"
+  { href: '/sections', label: 'Categories', icon: Layers },
   { href: '/account', label: 'Account', icon: User },
   { href: '/help', label: 'Help', icon: HelpCircle },
   { href: '/settings', label: 'Settings', icon: SettingsIcon },
@@ -36,10 +36,10 @@ export function Header() {
     toggleWishlist,
     fetchRecommendations,
     isLoadingRecommendations,
-    selectedCategory, // This is for sub-category filter within a main section/category page
-    setSelectedCategory, // This sets the sub-category filter
-    currentSectionConfig, // For old static sections (grocery, etc.)
-    currentSection, // For old static sections
+    selectedCategory,
+    setSelectedCategory,
+    currentSectionConfig,
+    currentSection,
     searchTerm,
     setSearchTerm,
     searchFilterType,
@@ -56,22 +56,20 @@ export function Header() {
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const wishlistItemCount = wishlist.length;
 
-  // Use currentSectionConfig for categories if on old static pages
-  // Otherwise, dynamic category pages manage their own sub-categories if needed (not implemented via arc)
   const categoriesList: SectionCategory[] = currentSectionConfig?.categories || [];
-  const sectionName = currentSectionConfig?.name || 'BoutiqueBox'; // Default for global pages
-  const sectionPath = currentSectionConfig?.path || '/sections'; // Default link for logo
+  const sectionName = currentSectionConfig?.name || 'BoutiqueBox';
+  const sectionPath = currentSectionConfig?.path || '/sections';
 
 
   const isAppFeaturePage = pathname === '/sections' ||
                            pathname.startsWith('/grocery') ||
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood') ||
-                           pathname.startsWith('/category/'); // Include dynamic category pages
+                           pathname.startsWith('/category/');
 
   useEffect(() => {
-    // AppContext now handles resetting search term
-  }, [pathname, setSearchTerm]);
+    // AppContext handles resetting search term based on path changes logic
+  }, [pathname, setSearchTerm]); // setSearchTerm might be re-evaluated by AppContext logic
 
   useEffect(() => {
     const handleScroll = () => {
@@ -96,13 +94,12 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 50; 
-  const yOffsetForArc = -10;   
-  const angleSpan = numCategories > 1 ? 180 : 0; 
+  const categoryArcRadius = 50;
+  const yOffsetForArc = -10;
+  const angleSpan = numCategories > 1 ? 180 : 0;
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
-  const iconPixelWidth = 48; 
+  const iconPixelWidth = 48;
 
-  // Determine if the category arc should be shown (only for old static sections with categories)
   const showCategoryArc = currentSection && currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/');
 
 
@@ -111,8 +108,8 @@ export function Header() {
       ref={headerRef}
       className={cn(
         "sticky top-0 z-40 w-full backdrop-blur supports-[backdrop-filter]:bg-opacity-65",
-        "rounded-b-[50px]", // This rounding might look odd if the arc is tall. Consider adjusting.
-        currentSectionConfig // Use config for theme only if on an old static section
+        "rounded-b-[25px]", // Adjusted rounding
+        currentSectionConfig
           ? "bg-[hsl(var(--header-bg-hsl)/0.85)] text-[hsl(var(--header-fg-hsl))] supports-[backdrop-filter]:bg-[hsl(var(--header-bg-hsl)/0.65)]"
           : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65",
         "transition-transform duration-300 ease-in-out",
@@ -122,7 +119,7 @@ export function Header() {
       <div className="container flex h-16 items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
           <Link
-            href={sectionPath} // Links to old section path or /sections
+            href={sectionPath}
             className={cn(
               "flex items-center gap-2",
               currentSectionConfig ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
@@ -131,8 +128,8 @@ export function Header() {
             <ShoppingBag className="h-7 w-7" />
             <span className="font-headline text-xl md:text-2xl font-bold">{sectionName}</span>
           </Link>
-          {currentSectionConfig && ( // Only show delivering to for old static sections
-            <div className="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
+          {currentSectionConfig && (
+            <div className="hidden md:flex items-center gap-1 text-sm opacity-80">
               <MapPin className="h-4 w-4" />
               <span>Delivering to: CA, USA</span>
             </div>
@@ -148,14 +145,14 @@ export function Header() {
                 placeholder="Search products..."
                 className={cn(
                   "w-full rounded-lg bg-transparent py-2 pl-8 h-9 text-sm",
-                  // Conditional styling based on whether we are in a themed section (old static) or default
-                  currentSectionConfig ? "border-[hsl(var(--header-fg-hsl)/0.3)] text-[hsl(var(--header-fg-hsl))] placeholder:text-[hsl(var(--header-fg-hsl)/0.7)] focus:bg-[hsl(var(--background))] focus:text-foreground" : "border-input placeholder:text-muted-foreground focus:bg-background/50",
-                  currentSectionConfig ? "pr-10" : "pr-2" // Space for filter icon if themed
+                  currentSectionConfig
+                    ? "border-[hsl(var(--header-fg-hsl)/0.3)] text-[hsl(var(--header-fg-hsl))] placeholder:text-[hsl(var(--header-fg-hsl)/0.7)] focus:bg-[hsl(var(--background))] focus:text-foreground pr-10"
+                    : "border-input placeholder:text-muted-foreground focus:bg-background/50 pr-2"
                 )}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {currentSectionConfig && ( // Show filter only if in an old static section
+              {currentSectionConfig && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -199,7 +196,7 @@ export function Header() {
                   href={item.href}
                   className={cn(
                     "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
-                    isActive ? "bg-[hsl(var(--primary)/0.2)] opacity-100" : "opacity-90",
+                    isActive ? (currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.15)] opacity-100" : "bg-primary/15 opacity-100 text-primary") : "opacity-90",
                     currentSectionConfig ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
                   )}
                   title={item.label}
@@ -211,10 +208,9 @@ export function Header() {
             })}
           </nav>
 
-          {desktopNavItems.length > 0 && <div className="hidden md:block h-6 w-px bg-[hsl(var(--border))] mx-2"></div>}
+          {desktopNavItems.length > 0 && <div className={cn("hidden md:block h-6 w-px mx-2", currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
 
           <div className="flex items-center gap-x-0.5 sm:gap-x-1">
-             {/* Recommendations button shown on product-listing pages (old static or new dynamic) */}
             {(currentSectionConfig || pathname.startsWith('/category/')) && (
               <Button
                 variant="ghost"
@@ -290,29 +286,28 @@ export function Header() {
         </div>
       </div>
 
-      {/* Category Arc - Show only for old static sections with defined categories */}
       {showCategoryArc && (
-         <div className="relative h-[50px] flex justify-center items-start">
+         <div className="relative h-[60px] sm:h-[70px] flex justify-center items-start mt-1 mb-2 overflow-hidden">
           <div className="relative w-[280px] h-[110px] sm:w-[360px] sm:h-[110px] md:w-[420px] md:h-[110px]">
             {categoriesList.map((category, index) => {
-              const angle = numCategories === 1 ? 0 : (startAngle + (index / (Math.max(1, numCategories - 1))) * angleSpan); // Avoid division by zero
+              const angle = numCategories === 1 ? 0 : (startAngle + (index / (Math.max(1, numCategories - 1))) * angleSpan);
               const radian = angle * (Math.PI / 180);
 
               const x = categoryArcRadius * Math.sin(radian);
               const y = yOffsetForArc + categoryArcRadius * Math.cos(radian);
 
-              const iconSizeClass = "w-12 h-12 sm:w-14 sm:h-14";
+              const iconSizeClass = "w-10 h-10 sm:w-12 sm:h-12";
 
               return (
                 <button
                   key={category.value}
                   onClick={() => setSelectedCategory(category.value)}
                   className={cn(
-                    "absolute p-2 rounded-full transition-all duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-2",
+                    "absolute p-1.5 sm:p-2 rounded-full transition-all duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-2",
                     currentSectionConfig ? "focus:ring-[hsl(var(--ring))]" : "focus:ring-ring",
                     selectedCategory === category.value
-                      ? 'bg-primary text-primary-foreground shadow-md scale-110'
-                      : 'bg-[hsl(var(--primary)/0.15)] shadow-sm hover:bg-[hsl(var(--primary)/0.3)]',
+                      ? (currentSectionConfig ? 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]' : 'bg-primary text-primary-foreground shadow-md scale-110')
+                      : (currentSectionConfig ? 'bg-[hsl(var(--header-fg-hsl)/0.1)] text-[hsl(var(--header-fg-hsl)/0.9)] hover:bg-[hsl(var(--header-fg-hsl)/0.2)]' : 'bg-primary/10 text-primary hover:bg-primary/20 shadow-sm'),
                     iconSizeClass,
                     "flex flex-col items-center justify-center"
                   )}
@@ -325,9 +320,10 @@ export function Header() {
                 >
                   <category.icon
                     className={cn(
-                      "h-5 w-5 sm:h-6 sm:h-6 mb-0.5",
-                      selectedCategory === category.value ? (currentSectionConfig ? '' : 'text-primary-foreground') : (currentSectionConfig ? 'text-primary' : 'text-primary')
+                      "h-4 w-4 sm:h-5 sm:h-5",
+                      selectedCategory === category.value ? '' : ''
                     )} style={{transform: \`rotate(\${-angle}deg)\`}} />
+                   <span className="text-[0.6rem] sm:text-[0.65rem] font-medium truncate mt-0.5" style={{transform: \`rotate(\${-angle}deg)\`}}>{category.label}</span>
                 </button>
               );
             })}
