@@ -68,7 +68,7 @@ interface AppContextType {
   isLoadingRecommendations: boolean;
 
   // For old static sections (grocery, cosmetics, fastfood)
-  currentSection: AppSection | null; 
+  currentSection: AppSection | null;
   currentSectionConfig: SectionConfig | null;
   setCurrentSection: React.Dispatch<React.SetStateAction<AppSection | null>>;
   setCurrentSectionConfig: React.Dispatch<React.SetStateAction<SectionConfig | null>>;
@@ -271,11 +271,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (error.code !== 'PGRST116') { 
         toast({ 
           title: "Profile Error", 
-          description: \`Could not load your profile details. \${error.message}\`, 
+          description: `Could not load your profile details. ${error.message}`, 
           variant: "destructive" 
         });
       } else {
-        console.warn(\`User profile not found for auth_id \${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.\`);
+        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
         toast({
             title: "Profile Setup Pending",
             description: "Your profile is being finalized. If this message persists, please try signing in again shortly or contact support.",
@@ -299,16 +299,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setAuthUser(currentAuthUser);
 
       if (currentAuthUser) {
+        console.log(`Auth state change: User ${currentAuthUser.id} event ${event}`);
         if (event === 'SIGNED_IN' && !currentAuthUser.email_confirmed_at) {
           console.log('User signed in but email not yet confirmed.');
         } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
-          console.log('User email confirmed or user updated post-confirmation.');
+          console.log('User email confirmed or user updated post-confirmation, fetching profile.');
           if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at && !session?.user?.user_metadata?.email_verified_toast_shown) {
               toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
           }
         }
         await fetchUserProfile(currentAuthUser.id);
       } else {
+        console.log('Auth state change: No user session.');
         setUserProfile(null);
       }
       setIsLoadingAuth(false);
@@ -388,7 +390,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     if (data.user) {
-        console.log(\`Supabase auth.signUp successful. Auth User ID: \${data.user.id}, Email: \${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.\`);
+        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.`);
     } else {
         console.warn("Supabase auth.signUp successful, but no user data returned in the response. This might indicate email confirmation is pending or an issue with Supabase project settings (e.g., auto-confirm off).");
     }
@@ -426,7 +428,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
     toast({
       title: "Added to Cart",
-      description: \`\${product.name} is now in your cart.\`,
+      description: `${product.name} is now in your cart.`,
     });
   }, [toast]);
 
@@ -434,7 +436,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Cart",
-      description: \`Item removed from your cart.\`,
+      description: `Item removed from your cart.`,
     });
   }, [toast]);
 
@@ -459,13 +461,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (prevWishlist.find((item) => item.id === product.id)) {
         toast({
           title: "Removed from Wishlist",
-          description: \`\${product.name} is no longer in your wishlist.\`,
+          description: `${product.name} is no longer in your wishlist.`,
         });
         return prevWishlist.filter(item => item.id !== product.id);
       }
       toast({
         title: "Added to Wishlist",
-        description: \`\${product.name} has been added to your wishlist.\`,
+        description: `${product.name} has been added to your wishlist.`,
       });
       return [...prevWishlist, product];
     });
@@ -475,7 +477,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setWishlist((prevWishlist) => prevWishlist.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Wishlist",
-      description: \`Item removed from your wishlist.\`,
+      description: `Item removed from your wishlist.`,
     });
   }, [toast]);
 
