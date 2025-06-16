@@ -1,148 +1,149 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    /* Default Theme: Grocery (Green) */
-    --background: 260 11% 95%; /* #F2F0F4 */
-    --foreground: 277 39% 15%; /* Dark Purple/Grey for text */
-
-    --card: 0 0% 100%; /* White */
-    --card-foreground: 277 39% 15%;
-
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 277 39% 15%;
-
-    --primary: 120 39% 50%; /* #4CAF50 - Green */
-    --primary-foreground: 0 0% 100%; /* White */
-
-    --secondary: 260 11% 90%;
-    --secondary-foreground: 277 39% 15%;
-
-    --muted: 260 11% 85%;
-    --muted-foreground: 260 10% 40%;
-
-    --accent: 36 100% 50%; /* #FF9800 - Orange */
-    --accent-foreground: 0 0% 100%;
-
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 260 10% 88%;
-    --input: 260 10% 88%;
-    --ring: 120 39% 50%; /* Green */
-
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-
-    --header-bg-hsl: 120 39% 50%; /* Green, same as primary */
-    --header-fg-hsl: 0 0% 100%; /* White, same as primary-foreground */
   }
 
   .dark {
-    /* Default Dark Theme (adjust if needed per section later) */
-    --background: 277 20% 10%;
-    --foreground: 260 11% 85%;
-
-    --card: 277 20% 12%;
-    --card-foreground: 260 11% 85%;
-
-    --popover: 277 20% 12%;
-    --popover-foreground: 260 11% 85%;
-
-    --primary: 120 39% 60%; /* Lighter Green */
-    --primary-foreground: 0 0% 0%; /* Black */
-
-    --secondary: 277 20% 20%;
-    --secondary-foreground: 260 11% 85%;
-
-    --muted: 277 20% 15%;
-    --muted-foreground: 260 11% 60%;
-
-    --accent: 36 100% 60%; /* Lighter Orange */
-    --accent-foreground: 0 0% 0%; /* Black */
-
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 277 20% 25%;
-    --input: 277 20% 25%;
-    --ring: 120 39% 60%; /* Lighter Green */
-    
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-
-    --header-bg-hsl: 120 39% 55%; /* Lighter Green */
-    --header-fg-hsl: 0 0% 0%; /* Black */
-  }
-
-  /* Cosmetics Theme */
-  .theme-cosmetics {
-    --primary: 320 70% 55%; /* Magenta */
-    --primary-foreground: 0 0% 100%; /* White */
-    --accent: 330 80% 75%; /* Light Pink/Magenta */
-    --accent-foreground: 277 39% 15%; /* Dark text for light accent */
-    --ring: 320 70% 55%;
-    --header-bg-hsl: 320 70% 55%;
-    --header-fg-hsl: 0 0% 100%;
-  }
-  .dark .theme-cosmetics {
-    --primary: 320 70% 65%; /* Lighter Magenta for dark */
-    --primary-foreground: 0 0% 0%; /* Black */
-    --accent: 330 80% 65%; /* Lighter Pink/Magenta for dark */
-    --accent-foreground: 0 0% 0%; /* Black */
-    --ring: 320 70% 65%;
-    --header-bg-hsl: 320 70% 60%;
-    --header-fg-hsl: 0 0% 0%;
-  }
-
-  /* FastFood Theme */
-  .theme-fastfood {
-    --primary: 0 72% 51%; /* Red (from destructive but slightly brighter) */
-    --primary-foreground: 0 0% 100%; /* White */
-    --accent: 30 100% 50%; /* Bright Orange */
-    --accent-foreground: 0 0% 0%; /* Black */
-    --ring: 0 72% 51%;
-    --header-bg-hsl: 0 72% 51%;
-    --header-fg-hsl: 0 0% 100%;
-  }
-   .dark .theme-fastfood {
-    --primary: 0 72% 61%; /* Lighter Red for dark */
-    --primary-foreground: 0 0% 0%; /* Black */
-    --accent: 30 100% 60%; /* Lighter Orange for dark */
-    --accent-foreground: 0 0% 0%; /* Black */
-    --ring: 0 72% 61%;
-    --header-bg-hsl: 0 72% 56%;
-    --header-fg-hsl: 0 0% 0%;
-  }
-
-  /* Grocery theme explicit class (though it's default) */
-  .theme-grocery {
-    /* Uses :root defaults */
-  }
-  .dark .theme-grocery {
-    /* Uses .dark defaults */
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 1s ease-out forwards;
   }
-  body {
-    @apply bg-background text-foreground;
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.8s ease-out forwards;
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.8s ease-out forwards;
+  }
+
+  .animate-gentle-bounce {
+    animation: gentleBounce 2s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 8s ease-in-out infinite 2s;
+  }
+
+  .animate-float-slow {
+    animation: float 10s ease-in-out infinite 1s;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gentleBounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(12deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(12deg);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-20px) rotate(1deg);
+  }
+  66% {
+    transform: translateY(-10px) rotate(-1deg);
   }
 }
