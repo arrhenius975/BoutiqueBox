@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn, Settings as SettingsIcon, HelpCircle, LayoutGrid, Layers, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn, Settings as SettingsIcon, HelpCircle, LayoutGrid, Layers, ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,7 @@ export function Header() {
     searchFilterType,
     setSearchFilterType,
     authUser,
+    userProfile, // Added userProfile here
     isLoadingAuth,
   } = useAppContext();
   const pathname = usePathname();
@@ -69,8 +70,8 @@ export function Header() {
                            pathname.startsWith('/category/');
   
   const isProductDetailPage = 
-    pathname.split('/').length === 4 && // e.g., /grocery/product-id/
-    (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || pathname.startsWith('/category/'));
+    pathname.split('/').length >= 3 && // e.g., /grocery/product-id or /category/cat-id/product-id
+    (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || (pathname.startsWith('/category/') && pathname.split('/').length > 3) );
 
 
   useEffect(() => {
@@ -103,10 +104,10 @@ export function Header() {
   const categoryArcRadius = 50; 
   const yOffsetForArc = 10; 
   const angleSpan = numCategories > 1 ? Math.min(120, numCategories * 30) : 0; 
-  const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
+  const startAngle = numCategories > 1 ? -angleSpan / 2 : (numCategories === 1 ? 0 : 0);
   const iconPixelWidth = 40; 
 
-  const showCategoryArc = currentSection && currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/') && !isProductDetailPage;
+  const showCategoryArc = currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/') && !isProductDetailPage;
 
   return (
     <header
@@ -216,9 +217,25 @@ export function Header() {
                 </Link>
               );
             })}
+             {/* Conditionally render Admin Panel link */}
+            {authUser && userProfile && userProfile.role === 'admin' && (
+              <Link
+                href="/admin/dashboard"
+                className={cn(
+                  "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
+                  pathname.startsWith('/admin') ? (currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.15)] opacity-100" : "bg-primary/15 opacity-100 text-primary") : "opacity-90",
+                  currentSectionConfig ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
+                )}
+                title="Admin Panel"
+              >
+                <Shield className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
 
-          {desktopNavItems.length > 0 && <div className={cn("hidden md:block h-6 w-px mx-2", currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
+          {(desktopNavItems.length > 0 || (authUser && userProfile && userProfile.role === 'admin')) && <div className={cn("hidden md:block h-6 w-px mx-2", currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
+
 
           <div className="flex items-center gap-x-0.5 sm:gap-x-1">
             {(currentSectionConfig || pathname.startsWith('/category/')) && !isProductDetailPage && (
@@ -343,3 +360,4 @@ export function Header() {
     </header>
   );
 }
+
