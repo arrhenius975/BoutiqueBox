@@ -38,8 +38,6 @@ export default function OrderHistoryPage() {
 
   const fetchOrders = useCallback(async () => {
     if (!authUser) { 
-        // This state should ideally be caught by the useEffect that calls fetchOrders,
-        // but this is a defensive check.
         setIsFetchingOrders(false);
         setFetchError("User not authenticated. Please sign in.");
         return;
@@ -49,15 +47,22 @@ export default function OrderHistoryPage() {
     try {
       const response = await fetch('/api/orders');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to parse error from server.' }));
-        throw new Error(errorData.error || `Server returned status ${response.status}`);
+        let errorDetail = `Server responded with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error || errorData.message || errorDetail;
+        } catch (e) {
+          const textError = await response.text().catch(() => '');
+          if (textError) errorDetail += ` - Response: ${textError.substring(0, 100)}...`;
+        }
+        throw new Error(errorDetail);
       }
       const data: DisplayOrder[] = await response.json();
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.error("Fetch orders error on client:", err);
       setFetchError(err.message || 'An unexpected error occurred while fetching orders.');
-      if (authUser) { // Only toast if user was theoretically logged in for the attempt
+      if (authUser) { 
         toast({
           title: "Error Fetching Orders",
           description: err.message || 'Could not load your order history.',
@@ -72,25 +77,17 @@ export default function OrderHistoryPage() {
   useEffect(() => {
     if (!isLoadingAuth) { 
       if (authUser) {
-        // User is authenticated, and auth loading is complete
-        // Fetch orders if they haven't been fetched or if an error previously occurred
-        // and we want to retry (e.g., if authUser just became available).
-        if (orders.length === 0 && !fetchError) { // Fetch if no orders and no prior error
+        if (orders.length === 0 && !fetchError) { 
              fetchOrders();
         } else if (fetchError && orders.length === 0) {
-            // If there was a fetch error and still no orders, it implies the error was "not authenticated"
-            // and we are now authenticated, so try fetching.
-            // Or if the error was something else, fetchOrders will clear it and retry.
             fetchOrders();
         }
       } else {
-        // Auth loading complete, but no authenticated user.
         setOrders([]); 
         setFetchError("Please log in to view your order history.");
-        setIsFetchingOrders(false); // Ensure this is false if not fetching
+        setIsFetchingOrders(false); 
       }
     }
-    // If isLoadingAuth is true, the main loader below handles it.
   }, [authUser, isLoadingAuth, fetchOrders, orders.length, fetchError]);
 
 
@@ -121,14 +118,12 @@ export default function OrderHistoryPage() {
           <AlertTitle>{!authUser && fetchError === "Please log in to view your order history." ? "Access Denied" : "Error Loading Orders"}</AlertTitle>
           <AlertDescription>
             {fetchError}
-            {/* Show "Try Again" only if user is authenticated but an error other than "not logged in" occurred */}
             {authUser && fetchError !== "Please log in to view your order history." && (
                 <Button onClick={fetchOrders} variant="link" className="p-0 h-auto ml-2" disabled={isFetchingOrders}>
                     {isFetchingOrders ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Try again
                 </Button>
             )}
-            {/* Show "Sign In" if the error is specifically due to not being logged in */}
             {fetchError === "Please log in to view your order history." && (
                 <Button asChild variant="link" className="p-0 h-auto ml-2">
                     <Link href={`/signin?redirect=/account/orders`}>Sign In</Link>
@@ -156,7 +151,7 @@ export default function OrderHistoryPage() {
         </Button>
       </header>
 
-      {!authUser && !isLoadingAuth ? ( // This case should be handled by fetchError block, but as a fallback
+      {!authUser && !isLoadingAuth ? ( 
            <Card className="text-center py-12">
             <CardHeader>
                 <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
@@ -236,4 +231,3 @@ export default function OrderHistoryPage() {
     </div>
   );
 }
-

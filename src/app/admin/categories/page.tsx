@@ -26,11 +26,19 @@ export default function AdminCategoriesPage() {
     try {
       const response = await fetch('/api/categories');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch categories' }));
-        throw new Error(errorData.error);
+        let errorDetail = `Server responded with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error || errorData.message || errorDetail;
+        } catch (e) {
+          // response was not JSON, try to get text for more context
+          const textError = await response.text().catch(() => ''); // prevent further error if text() fails
+          if (textError) errorDetail += ` - Response: ${textError.substring(0, 100)}...`;
+        }
+        throw new Error(errorDetail);
       }
       const data = await response.json();
-      setCategories(data);
+      setCategories(Array.isArray(data) ? data : []); // Ensure data is an array
     } catch (error) {
       console.error("Fetch categories error:", error);
       toast({ title: "Error Fetching Categories", description: (error as Error).message, variant: "destructive" });

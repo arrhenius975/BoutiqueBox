@@ -40,11 +40,18 @@ export default function AdminProductsPage() {
     try {
       const response = await fetch('/api/categories');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch categories' }));
-        throw new Error(errorData.error);
+        let errorDetail = `Server responded with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error || errorData.message || errorDetail;
+        } catch (e) {
+          const textError = await response.text().catch(() => '');
+          if (textError) errorDetail += ` - Response: ${textError.substring(0, 100)}...`;
+        }
+        throw new Error(errorDetail);
       }
       const data: AdminUICategoryType[] = await response.json();
-      setAllCategories(data);
+      setAllCategories(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Fetch categories error:", error);
       toast({ title: "Error Fetching Categories", description: (error as Error).message, variant: "destructive" });
@@ -59,12 +66,20 @@ export default function AdminProductsPage() {
     try {
       const response = await fetch('/api/products');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch products and parse error' }));
-        throw new Error(errorData.error || 'Failed to fetch products');
+        let errorDetail = `Server responded with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error || errorData.message || errorDetail;
+        } catch (e) {
+          const textError = await response.text().catch(() => '');
+          if (textError) errorDetail += ` - Response: ${textError.substring(0, 100)}...`;
+        }
+        throw new Error(errorDetail);
       }
-      const data = await response.json();
+      const rawData = await response.json();
+      const dataToFormat = Array.isArray(rawData) ? rawData : [];
 
-      const formattedProducts: Product[] = data.map((p: any) => {
+      const formattedProducts: Product[] = dataToFormat.map((p: any) => {
         return {
           id: p.id,
           name: p.name,
@@ -252,7 +267,7 @@ export default function AdminProductsPage() {
             <Select
                 value={filterCategoryId}
                 onValueChange={(value) => setFilterCategoryId(value)}
-                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
+                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Filter by category" />

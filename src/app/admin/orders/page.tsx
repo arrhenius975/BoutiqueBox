@@ -36,11 +36,18 @@ export default function AdminOrdersPage() {
     try {
       const response = await fetch('/api/admin/orders');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch orders' }));
-        throw new Error(errorData.error);
+        let errorDetail = `Server responded with status ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.error || errorData.message || errorDetail;
+        } catch (e) {
+          const textError = await response.text().catch(() => '');
+          if (textError) errorDetail += ` - Response: ${textError.substring(0, 100)}...`;
+        }
+        throw new Error(errorDetail);
       }
       const data: DisplayOrder[] = await response.json();
-      setOrders(data);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Fetch admin orders error:", error);
       toast({ title: "Error Fetching Orders", description: (error as Error).message, variant: "destructive" });
@@ -178,4 +185,3 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
-```
