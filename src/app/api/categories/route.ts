@@ -1,16 +1,15 @@
 
 // src/app/api/categories/route.ts
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { supabase } from '@/data/supabase'; // Reverted to global client
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+async function isAdmin(): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabaseClient
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -20,8 +19,7 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
-  if (!await isAdmin(supabase)) {
+  if (!await isAdmin()) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -56,13 +54,10 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   // GETting categories is public, no admin check needed here.
-  // However, we still use createRouteHandlerClient for consistency if we decided to make it protected later or for other reasons.
-  // For a truly public endpoint, the global supabase client from `src/data/supabase` could also be used.
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   try {
     const { data, error } = await supabase
       .from('categories')
-      .select('id, name, description') // Removed created_at
+      .select('id, name, description') 
       .order('name', { ascending: true });
 
     if (error) {

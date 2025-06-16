@@ -1,15 +1,14 @@
 
-import { createRouteHandlerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { supabase } from '@/data/supabase'; // Reverted to global client
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+async function isAdmin(): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabaseClient
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -20,9 +19,7 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 
 
 export async function POST(req: NextRequest) {
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
-
-  if (!await isAdmin(supabase)) {
+  if (!await isAdmin()) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -31,28 +28,24 @@ export async function POST(req: NextRequest) {
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
     const priceStr = formData.get('price') as string;
-    const stockStr = formData.get('stock') as string | null; // Stock might not always be provided
+    const stockStr = formData.get('stock') as string | null; 
     const category_id_str = formData.get('category_id') as string;
-    const brand_id_str = formData.get('brand_id') as string | null; // Brand ID might be optional
-    const dataAiHint = formData.get('data_ai_hint') as string | null; // Changed from dataAiHint to data_ai_hint
+    const brand_id_str = formData.get('brand_id') as string | null; 
+    const dataAiHint = formData.get('data_ai_hint') as string | null; 
 
     const imageFile = formData.get('imageFile') as File | null;
 
-    // Validate required fields
-    if (!name || !priceStr || !category_id_str || !stockStr) { // Added stockStr to required
+    if (!name || !priceStr || !category_id_str || !stockStr) { 
         return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
-     // Image file is required for new product if provided
     if (imageFile && imageFile.size === 0) {
         return NextResponse.json({ error: 'Image file cannot be empty if provided.' }, { status: 400 });
     }
 
 
     const price = parseFloat(priceStr);
-    // Default stock to 0 if not provided or invalid, but ensure it's a number
     const stock = parseInt(stockStr, 10);
     const category_id = parseInt(category_id_str, 10);
-    // brand_id can be null if not provided or if the string is 'null' or empty
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '') ? parseInt(brand_id_str, 10) : null;
 
     if (isNaN(price) || isNaN(stock) || isNaN(category_id)) {
@@ -62,8 +55,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid numeric value for brand_id' }, { status: 400 });
     }
 
-
-    // 1. Create product in 'products' table
     const productInsertPayload: {
         name: string;
         description?: string;
@@ -93,7 +84,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: productInsertError?.message || 'Product insertion failed' }, { status: 500 });
     }
 
-    let publicUrl = `https://placehold.co/400x300.png?text=${name.substring(0,2)}`; // Default placeholder
+    let publicUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(name.substring(0,2))}`; 
 
     if (imageFile && imageFile.size > 0) {
         const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
@@ -105,8 +96,6 @@ export async function POST(req: NextRequest) {
 
         if (uploadErr) {
             console.error('Image upload error:', uploadErr);
-            // Product created, but image upload failed. Consider if product should be deleted or if this is acceptable.
-            // For now, return an error indicating partial failure.
             return NextResponse.json({ error: `Product created, but image upload failed: ${uploadErr.message}. Product ID: ${productData.id}` }, { status: 500 });
         }
 
@@ -120,7 +109,6 @@ export async function POST(req: NextRequest) {
         }
         publicUrl = urlData.publicUrl;
 
-        // 3. Save image URL to 'product_images' table
         const { error: productImageInsertError } = await supabase.from('product_images').insert({
             product_id: productData.id,
             image_url: publicUrl,
@@ -132,7 +120,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: `Product created, image uploaded, but linking image to product failed: ${productImageInsertError.message}. Product ID: ${productData.id}` }, { status: 500 });
         }
     } else {
-        // If no image file was provided, still insert a placeholder into product_images for consistency
          const { error: placeholderImageInsertError } = await supabase.from('product_images').insert({
             product_id: productData.id,
             image_url: publicUrl,
@@ -140,12 +127,10 @@ export async function POST(req: NextRequest) {
         });
          if (placeholderImageInsertError) {
             console.warn('Failed to insert placeholder image URL for product:', productData.id, placeholderImageInsertError);
-            // This is not a critical failure, so we can proceed.
         }
     }
 
-    // Return the created product data, potentially including the image URL for client-side update
-    return NextResponse.json({ success: true, product: { ...productData, image: publicUrl, category: { name: category_id_str } /* simple mock for immediate UI update */ } });
+    return NextResponse.json({ success: true, product: { ...productData, image: publicUrl, category: { name: category_id_str } } });
   } catch (e: unknown) {
     console.error('POST /api/products unexpected error:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
@@ -154,8 +139,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // GETting products is public.
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   try {
     const { data, error } = await supabase
       .from('products')

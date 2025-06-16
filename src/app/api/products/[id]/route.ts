@@ -1,15 +1,14 @@
 
-import { createRouteHandlerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { supabase } from '@/data/supabase'; // Reverted to global client
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+async function isAdmin(): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabaseClient
+  const { data: profile, error: profileError } = await supabase
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -22,8 +21,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
-  if (!await isAdmin(supabase)) {
+  if (!await isAdmin()) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -59,7 +57,7 @@ export async function DELETE(
           try {
             const url = new URL(img.image_url);
             const pathSegments = url.pathname.split('/');
-            if (pathSegments.length > 6 && pathSegments[5] === 'product-images') {
+            if (pathSegments.length > 6 && pathSegments[5] === 'product-images') { // supabase-project-ref/storage/v1/object/public/product-images/...
               imagePathsToDelete.push(pathSegments.slice(6).join('/'));
             } else {
                console.warn(`Could not parse path from image URL for deletion: ${img.image_url}`);
@@ -98,8 +96,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
-  if (!await isAdmin(supabase)) {
+  if (!await isAdmin()) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -116,19 +113,19 @@ export async function PUT(
     const brand_id_str = formData.get('brand_id') as string | null;
     const dataAiHint = formData.get('data_ai_hint') as string | null;
     const imageFile = formData.get('imageFile') as File | null;
-    const stockStr = formData.get('stock') as string | null; // Get stock as string first
+    const stockStr = formData.get('stock') as string | null; 
 
 
-    if (!name || !priceStr || !category_id_str || !stockStr) { // Added stockStr to required check
+    if (!name || !priceStr || !category_id_str || !stockStr) { 
       return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
 
     const price = parseFloat(priceStr);
     const category_id = parseInt(category_id_str, 10);
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '') ? parseInt(brand_id_str, 10) : null;
-    const stock = parseInt(stockStr, 10); // Parse stock
+    const stock = parseInt(stockStr, 10); 
 
-    if (isNaN(price) || isNaN(category_id) || isNaN(stock) ) { // Added stock to NaN check
+    if (isNaN(price) || isNaN(category_id) || isNaN(stock) ) { 
       return NextResponse.json({ error: 'Invalid numeric value for price, category_id, or stock' }, { status: 400 });
     }
      if (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '' && isNaN(brand_id as number)) {
@@ -149,7 +146,7 @@ export async function PUT(
       name,
       description: description || undefined,
       price,
-      stock, // Include stock in payload
+      stock, 
       category_id,
       brand_id: brand_id,
       data_ai_hint: dataAiHint || name.toLowerCase().split(" ")[0] || "product",
@@ -182,7 +179,6 @@ export async function PUT(
     let finalImageUrl = updatedProductData.product_images?.find(img => img.is_primary)?.image_url;
 
     if (imageFile && imageFile.size > 0) {
-      // Delete old images from storage and product_images table
       const { data: oldImages, error: oldImagesError } = await supabase
         .from('product_images')
         .select('image_url')
@@ -213,13 +209,12 @@ export async function PUT(
         if (deleteDbImagesError) console.warn(`Failed to delete old image records from DB for ${productId}: ${deleteDbImagesError.message}`);
       }
 
-      // Upload new image
       const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const newFilePath = `${productId}/${Date.now()}-${sanitizedFileName}`;
+      const newFilePath = `product-images/${productId}/${Date.now()}-${sanitizedFileName}`; // Changed to subfolder
 
       const { error: uploadErr } = await supabase.storage
         .from('product-images')
-        .upload(newFilePath, imageFile, { upsert: false, contentType: imageFile.type });
+        .upload(newFilePath, imageFile, { upsert: true, contentType: imageFile.type }); // Changed to true
 
       if (uploadErr) {
         console.error('New image upload error during update:', uploadErr);
@@ -233,7 +228,6 @@ export async function PUT(
       }
       finalImageUrl = urlData.publicUrl;
 
-      // Insert new image record
       const { error: newProductImageInsertError } = await supabase.from('product_images').insert({
         product_id: productId,
         image_url: finalImageUrl,
@@ -242,12 +236,10 @@ export async function PUT(
 
       if (newProductImageInsertError) {
         console.error('New product image DB insert error:', newProductImageInsertError);
-        // Even if this fails, the product itself was updated.
         return NextResponse.json({ error: `Product updated, image uploaded, but linking new image in DB failed: ${newProductImageInsertError.message}. Product ID: ${productId}` }, { status: 500 });
       }
     }
 
-    // Refetch product data to include the potentially new image URL in the response
     const { data: finalProductData, error: finalProductFetchError } = await supabase
       .from('products')
       .select(\`
