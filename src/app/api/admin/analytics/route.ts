@@ -51,18 +51,45 @@ import type { NextRequest } from 'next/server';
 
 
 export async function GET(req: NextRequest) {
+  console.log('API /api/admin/analytics: Received GET request.');
   try {
-    const { data: user, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    console.log('API /api/admin/analytics: Attempting to get user session.');
+    const { data: { user: authApiUser }, error: authError } = await supabase.auth.getUser();
 
+    if (authError) {
+      console.error('API /api/admin/analytics: Auth error when calling supabase.auth.getUser():', authError.message);
+      return NextResponse.json({ error: `Auth service error: ${authError.message}` }, { status: 500 });
+    }
+
+    if (!authApiUser) {
+      console.warn('API /api/admin/analytics: No authenticated user found in API route. Session cookies might be missing or invalid.');
+      return NextResponse.json({ error: 'User not authenticated. No session found in API route.' }, { status: 401 });
+    }
+    console.log(`API /api/admin/analytics: Authenticated user found: ${authApiUser.email} (Auth ID: ${authApiUser.id})`);
+
+    console.log(`API /api/admin/analytics: Fetching profile for auth_id ${authApiUser.id}`);
     const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('role')
-        .eq('auth_id', user.id)
+        .eq('auth_id', authApiUser.id)
         .single();
     
-    if (profileError || !profile) return NextResponse.json({ error: 'Could not fetch user profile or profile not found.' }, { status: 403 });
-    if (profile.role !== 'admin') return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
+    if (profileError) {
+      console.error(`API /api/admin/analytics: Error fetching profile for auth_id ${authApiUser.id}:`, profileError);
+      return NextResponse.json({ error: `Could not fetch user profile: ${profileError.message}` }, { status: 500 });
+    }
+    if (!profile) {
+        console.warn(`API /api/admin/analytics: Profile not found for auth_id ${authApiUser.id}`);
+        return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+    }
+    console.log(`API /api/admin/analytics: Profile found for auth_id ${authApiUser.id}. Role: ${profile.role}`);
+
+    if (profile.role !== 'admin') {
+      console.warn(`API /api/admin/analytics: User ${authApiUser.email} (Auth ID: ${authApiUser.id}) is not an admin. Role: ${profile.role}`);
+      return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
+    }
+    console.log(`API /api/admin/analytics: User ${authApiUser.email} is admin. Proceeding to fetch analytics.`);
+
 
     const [
         revenueData, 
@@ -80,12 +107,12 @@ export async function GET(req: NextRequest) {
       supabase.from('orders_count_last_30_days').select('count').single() // Assumes view exists
     ]);
 
-    if (revenueData.error) throw new Error(`Revenue data error: ${revenueData.error.message}`);
-    if (inventoryData.error) throw new Error(`Inventory data error: ${inventoryData.error.message}`);
-    if (signupsData.error) throw new Error(`Signups data error: ${signupsData.error.message}`);
-    if (totalOrdersData.error) throw new Error(`Total orders data error: ${totalOrdersData.error.message}`);
-    if (activeUsersCountData.error) throw new Error(`Active users count error: ${activeUsersCountData.error.message}. Ensure 'active_users_count_last_30_days' view exists.`);
-    if (ordersLast30DaysCountData.error) throw new Error(`Orders last 30 days count error: ${ordersLast30DaysCountData.error.message}. Ensure 'orders_count_last_30_days' view exists.`);
+    if (revenueData.error) throw new Error(`Analytics error - Revenue data: ${revenueData.error.message}`);
+    if (inventoryData.error) throw new Error(`Analytics error - Inventory data: ${inventoryData.error.message}`);
+    if (signupsData.error) throw new Error(`Analytics error - Signups data: ${signupsData.error.message}`);
+    if (totalOrdersData.error) throw new Error(`Analytics error - Total orders data: ${totalOrdersData.error.message}`);
+    if (activeUsersCountData.error) throw new Error(`Analytics error - Active users count: ${activeUsersCountData.error.message}. Ensure 'active_users_count_last_30_days' view exists.`);
+    if (ordersLast30DaysCountData.error) throw new Error(`Analytics error - Orders last 30 days count: ${ordersLast30DaysCountData.error.message}. Ensure 'orders_count_last_30_days' view exists.`);
 
     const totalOrders = totalOrdersData.count || 0;
     const activeUsersCount = activeUsersCountData.data?.count || 0;
@@ -95,7 +122,7 @@ export async function GET(req: NextRequest) {
     if (activeUsersCount > 0) {
       conversionRate = (ordersLast30DaysCount / activeUsersCount) * 100;
     }
-
+    console.log('API /api/admin/analytics: Successfully fetched and processed analytics data.');
     return NextResponse.json({
       revenue: revenueData.data,
       inventory: inventoryData.data,
@@ -104,13 +131,13 @@ export async function GET(req: NextRequest) {
         totalRevenue: revenueData.data?.reduce((sum, item) => sum + (item.revenue || 0), 0) || 0,
         totalOrders: totalOrders,
         activeUsers: activeUsersCount,
-        conversionRate: parseFloat(conversionRate.toFixed(1)), // Keep one decimal place
+        conversionRate: parseFloat(conversionRate.toFixed(1)), 
       }
     });
 
   } catch (e: unknown) {
-    console.error('GET /api/admin/analytics general error:', e);
-    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching admin analytics.';
+    console.error('API /api/admin/analytics: General error in GET handler:', errorMessage);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
