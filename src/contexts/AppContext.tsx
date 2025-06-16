@@ -230,7 +230,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .single();
     if (error) {
       console.error('Error fetching user profile:', error);
-      toast({ title: "Profile Error", description: "Could not load your profile details. Ensure the 'role' column exists in your 'users' table.", variant: "destructive" });
+      // Only show destructive toast if it's not a "resource not found" type error, 
+      // which is expected if the trigger hasn't run yet for a new user.
+      if (error.code !== 'PGRST116') { // PGRST116: "Row to be returned was not found"
+        toast({ 
+          title: "Profile Error", 
+          description: `Could not load your profile details. ${error.message}`, 
+          variant: "destructive" 
+        });
+      } else {
+        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up.`);
+        toast({
+            title: "Profile Not Yet Ready",
+            description: "Your profile is being set up. If this persists, please try signing in again shortly or contact support. Ensure a database trigger exists to sync auth.users with public.users.",
+            variant: "default"
+        });
+      }
       setUserProfile(null); 
       return null;
     } else {
@@ -250,7 +265,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (event === 'SIGNED_IN' && !currentAuthUser.email_confirmed_at) {
           console.log('User signed in but email not yet confirmed.');
         } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
-          // Check if email_confirmed_at exists and userProfile email is not set, indicating a fresh confirmation
           console.log('User email confirmed or user updated post-confirmation.');
           toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
         }
@@ -279,7 +293,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [fetchUserProfile, toast, userProfile?.email]); // Added userProfile.email to dependencies
+  }, [fetchUserProfile, toast, userProfile?.email]);
 
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
     setIsLoadingAuth(true);
@@ -291,6 +305,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     toast({ title: "Signed In Successfully!"});
+    // fetchUserProfile will be called by onAuthStateChange
+    setIsLoadingAuth(false); // Ensure loading state is reset
     return true; 
   };
 
@@ -310,7 +326,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     
+    if (data.user) {
+        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger for public.users profile creation.`);
+    } else {
+        console.warn("Supabase auth.signUp successful, but no user data returned in the response. This might indicate email confirmation is pending or an issue with Supabase project settings (e.g., auto-confirm off).");
+    }
+    
     toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
+    setIsLoadingAuth(false); // Reset loading state
     return true; 
   };
   
@@ -322,8 +345,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(false); 
     } else {
       toast({ title: "Signed Out"});
-      router.push('/'); 
+      // AppContext's onAuthStateChange will set authUser and userProfile to null
+      // router.push('/'); // No need to push here, onAuthStateChange handles user state update, page components will react.
     }
+    setIsLoadingAuth(false); // Ensure loading state is reset
   };
 
 
