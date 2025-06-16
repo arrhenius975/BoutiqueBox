@@ -1,4 +1,3 @@
-
 // src/app/admin/products/components/ProductForm.tsx
 "use client";
 
@@ -172,8 +171,16 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
           </div>
            <div className="space-y-2">
             <Label htmlFor="dataAiHint">AI Image Hint (1-2 words)</Label>
-            <Input id="dataAiHint" value={dataAiHint} onChange={(e) => setDataAiHint(e.target.value)} placeholder="e.g. red apple" disabled={isSubmitting}/>
-            <p className="text-xs text-muted-foreground">Helps generate placeholder images. E.g., 'red apple', 'face cream'.</p>
+            <Input 
+              id="dataAiHint" 
+              value={dataAiHint} 
+              onChange={(e) => setDataAiHint(e.target.value)} 
+              placeholder="e.g. red apple, face cream, plush toy" 
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              Helps generate relevant placeholder images if no image is uploaded. Max 2 words.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="image-upload">Product Image {!product?.id && <span className="text-destructive">*</span>}</Label>

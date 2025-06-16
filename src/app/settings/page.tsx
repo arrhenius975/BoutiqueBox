@@ -42,7 +42,6 @@ export default function SettingsPage() {
 
   const handleNotificationChange = (type: keyof typeof notifications, value: boolean) => {
     setNotifications(prev => ({ ...prev, [type]: value }));
-    // In a real app, you'd save this preference to the backend.
     toast({ title: "Notification settings are local for now."});
   };
 
@@ -294,7 +293,9 @@ export default function SettingsPage() {
         </Card>
 
         <div className="text-center mt-8">
-          <Button disabled>Save All Settings (Soon)</Button>
+          <Button disabled title="Functionality for saving general app settings (like notifications or language) will be added later.">
+            Save All Settings (Soon)
+          </Button>
         </div>
       </div>
     </div>

@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud, Save, KeyRound } from "lucide-react"; // Added Save, KeyRound
+import { Edit3, MapPin, ShieldCheck, CreditCard, LogOut, ShoppingBasket, Bell, Heart, MessageSquareQuote, Loader2, UploadCloud, Save, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useAppContext } from '@/contexts/AppContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AccountPage() {
-  const { authUser, userProfile, isLoadingAuth, signOut, setUserProfile } = useAppContext();
+  const { authUser, userProfile, isLoadingAuth, signOut, setUserProfile, toggleWishlist } = useAppContext(); // Added toggleWishlist
   const router = useRouter();
   const { toast } = useToast();
   
@@ -70,7 +70,7 @@ export default function AccountPage() {
         if (avatarFile.size > 2 * 1024 * 1024) { 
             toast({ title: "Avatar Too Large", description: "Please select an image smaller than 2MB.", variant: "destructive" });
             if (fileInputRef.current) fileInputRef.current.value = "";
-            setLocalAvatarPreviewUrl(userProfile.avatar_url || null); // Revert preview if too large
+            setLocalAvatarPreviewUrl(userProfile.avatar_url || null);
             setIsUpdatingProfile(false);
             if(loadingToastId) toast.dismiss(loadingToastId);
             return;
@@ -109,7 +109,6 @@ export default function AccountPage() {
     } catch (error) {
       console.error('Profile Update Error:', error);
       toast({ title: 'Profile Update Failed', description: (error as Error).message, variant: 'destructive' });
-      // Revert local name and avatar preview if API call fails
       setEditableName(userProfile.name || '');
       setLocalAvatarPreviewUrl(userProfile.avatar_url || null);
     } finally {
@@ -158,6 +157,18 @@ export default function AccountPage() {
   const handleLogout = async () => {
     await signOut();
   };
+
+  const accountOptions = [
+    { label: "Order History", icon: ShoppingBasket, href: "/account/orders" },
+    { label: "Change Password", icon: KeyRound, href: "/settings" },
+    { label: "Saved Addresses", icon: MapPin, href: "#", disabled: true, isSoon: true },
+    { label: "Payment Methods", icon: CreditCard, href: "#", disabled: true, isSoon: true },
+    { label: "Notification Preferences", icon: Bell, href: "/settings" },
+    { label: "My Wishlist", icon: Heart, action: toggleWishlist, disabled: false }, // Made functional
+    { label: "Security & Privacy", icon: ShieldCheck, href: "/settings" },
+    { label: "Help & Support", icon: MessageSquareQuote, href: "/help" },
+  ];
+
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -247,32 +258,38 @@ export default function AccountPage() {
               <CardTitle>Account Options</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              {[
-                { label: "Order History", icon: ShoppingBasket, href: "/account/orders" },
-                { label: "Change Password", icon: KeyRound, href: "/settings" }, // Direct to settings for password change
-                { label: "Saved Addresses", icon: MapPin, href: "#", disabled: true },
-                { label: "Payment Methods", icon: CreditCard, href: "#", disabled: true },
-                { label: "Notification Preferences", icon: Bell, href: "/settings" },
-                { label: "My Wishlist", icon: Heart, href: "#", action: () => console.log("Open Wishlist Sidebar via context (Not Implemented as page)"), disabled: true },
-                { label: "Security & Privacy", icon: ShieldCheck, href: "/settings" }, // General security to settings
-                { label: "Help & Support", icon: MessageSquareQuote, href: "/help" },
-              ].map(item => (
+              {accountOptions.map(item => (
                 <React.Fragment key={item.label}>
-                  <Link
-                    href={item.disabled ? "#" : item.href}
-                    className={`flex items-center justify-between p-3 rounded-md transition-colors ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary'}`}
-                    onClick={(e) => { 
+                  {item.href ? (
+                    <Link
+                      href={item.disabled ? "#" : item.href}
+                      className={`flex items-center justify-between p-3 rounded-md transition-colors ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary'}`}
+                      onClick={(e) => { if (item.disabled) e.preventDefault(); }}
+                      aria-disabled={item.disabled}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="h-5 w-5 text-primary" />
+                        <span>{item.label} {item.isSoon ? "(Soon)" : ""}</span>
+                      </div>
+                      <Edit3 className="h-4 w-4 text-muted-foreground" />
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={(e) => {
                         if (item.disabled) e.preventDefault();
                         else if (item.action) item.action();
-                    }}
-                    aria-disabled={item.disabled}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="h-5 w-5 text-primary" />
-                      <span>{item.label} {item.disabled ? "(Soon)" : ""}</span>
-                    </div>
-                    <Edit3 className="h-4 w-4 text-muted-foreground" />
-                  </Link>
+                      }}
+                      disabled={item.disabled}
+                      className={`flex items-center justify-between p-3 rounded-md transition-colors w-full text-left ${item.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-secondary'}`}
+                      aria-disabled={item.disabled}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="h-5 w-5 text-primary" />
+                        <span>{item.label} {item.isSoon ? "(Soon)" : ""}</span>
+                      </div>
+                      <Edit3 className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
                   <Separator />
                 </React.Fragment>
               ))}

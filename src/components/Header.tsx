@@ -93,12 +93,11 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  // Arc parameters - adjusted for new visual alignment
-  const categoryArcRadius = 50; // Shallower arc
-  const yOffsetForArc = -10;    // Shift arc upwards
-  const angleSpan = numCategories > 1 ? 180 : 0; // Keep 180-degree span for semicircle
+  const categoryArcRadius = 50; 
+  const yOffsetForArc = -10;   
+  const angleSpan = numCategories > 1 ? 180 : 0; 
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
-  const iconPixelWidth = 48; // Assuming average button width for positioning calculations
+  const iconPixelWidth = 48; 
 
 
   return (
@@ -292,7 +291,7 @@ export function Header() {
          <div className="relative h-[50px] flex justify-center items-start"> {/* Outer container: Reduced height, no mt */}
           <div className="relative w-[280px] h-[110px] sm:w-[360px] sm:h-[110px] md:w-[420px] md:h-[110px]"> {/* Inner positioning context: Adjusted height */}
             {categoriesList.map((category, index) => {
-              const angle = numCategories > 1 ? startAngle + (index / (numCategories - 1)) * angleSpan : 0;
+              const angle = numCategories === 1 ? 0 : (startAngle + (index / (numCategories - 1)) * angleSpan);
               const radian = angle * (Math.PI / 180);
 
               const x = categoryArcRadius * Math.sin(radian);
@@ -334,5 +333,4 @@ export function Header() {
     </header>
   );
 }
-
     
