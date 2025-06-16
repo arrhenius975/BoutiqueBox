@@ -51,10 +51,12 @@ export async function PUT(
         return NextResponse.json({ error: 'Category not found.' }, { status: 404 });
     }
 
+    // Removed updated_at from the payload
+    const updatePayload = { name: name.trim(), description: description?.trim() || null };
 
     const { data, error } = await supabase
       .from('categories')
-      .update({ name: name.trim(), description: description?.trim() || null, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', categoryId)
       .select()
       .single();

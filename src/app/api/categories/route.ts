@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data, error } = await supabase
       .from('categories')
-      .select('id, name, description, created_at')
+      .select('id, name, description') // Removed created_at
       .order('name', { ascending: true });
 
     if (error) {

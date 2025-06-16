@@ -11,7 +11,7 @@ import type { SupabaseCategory } from '@/types';
 import { CategoryForm, type CategoryFormSubmitData } from './components/CategoryForm';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+// import { format } from 'date-fns'; // No longer needed as created_at is removed
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<SupabaseCategory[]>([]);
@@ -150,7 +150,7 @@ export default function AdminCategoriesPage() {
                 <TableHead className="w-[80px]">ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead className="hidden md:table-cell">Created At</TableHead>
+                {/* <TableHead className="hidden md:table-cell">Created At</TableHead> Removed Created At column */}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -160,9 +160,11 @@ export default function AdminCategoriesPage() {
                   <TableCell className="font-medium">{category.id}</TableCell>
                   <TableCell>{category.name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{category.description || '-'}</TableCell>
+                  {/* Removed Created At cell 
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                     {category.created_at ? format(new Date(category.created_at), 'PPpp') : '-'}
                   </TableCell>
+                  */}
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="icon" onClick={() => handleEditCategory(category)} title="Edit Category" disabled={isSubmitting}>
@@ -176,7 +178,8 @@ export default function AdminCategoriesPage() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center h-24">
+                  {/* Adjusted colSpan since one column was removed */}
+                  <TableCell colSpan={4} className="text-center h-24">
                     No categories found. Click 'Add New Category' to get started.
                   </TableCell>
                 </TableRow>

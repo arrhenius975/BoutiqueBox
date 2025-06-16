@@ -117,8 +117,7 @@ export interface SupabaseCategory {
   id: number; // serial, primary key
   name: string; // text, not null, unique
   description?: string | null; // text
-  created_at?: string; // timestamp
-  updated_at?: string; // timestamp
+  // created_at and updated_at removed to match schema
 }
 
 export interface SupabaseBrand {
