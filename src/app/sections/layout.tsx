@@ -1,20 +1,11 @@
 // src/app/sections/layout.tsx
-import { LayoutComponent } from '@/components/Layout';
-import { ThemeManager } from '@/components/ThemeManager';
-// MainLandingBottomNav import removed as it's no longer used.
+// This layout is for the deprecated /sections page.
+// It can be removed or its content emptied.
 
-export default function SectionsLayout({
+export default function DeprecatedSectionsLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <>
-      <ThemeManager themeClass="" /> {/* Use default/global theme for sections page */}
-      <LayoutComponent> {/* This includes Header, main content area, etc. */}
-        {children}
-      </LayoutComponent>
-      {/* BottomNavBar is now part of LayoutComponent */}
-    </>
-  );
+  return <>{children}</>;
 }

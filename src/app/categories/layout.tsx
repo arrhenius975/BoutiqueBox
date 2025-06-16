@@ -1,9 +1,21 @@
+// src/app/categories/layout.tsx
+import { LayoutComponent } from '@/components/Layout';
+import { ThemeManager } from '@/components/ThemeManager';
 
-// This layout is no longer used as src/app/categories/page.tsx has been deprecated.
-export default function DeprecatedCategoriesLayout({
+export default function CategoriesPageLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  // This page has a very specific theme, which will be largely controlled
+  // by its own page.tsx. ThemeManager here ensures any global theme classes
+  // are cleared if this page isn't meant to inherit them.
+  return (
+    <>
+      <ThemeManager themeClass="theme-categories-custom" /> {/* Custom class to isolate, or "" to clear */}
+      <LayoutComponent>
+        {children}
+      </LayoutComponent>
+    </>
+  );
 }

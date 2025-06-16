@@ -14,11 +14,11 @@ export function BottomNavBar() {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
-  const sectionHomePath = currentSectionConfig?.path || '/sections'; // Default to /sections if no specific section
+  const sectionHomePath = currentSectionConfig?.path || '/categories'; // Default to new /categories page
 
   const navItems = [
     { href: sectionHomePath, label: 'Home', icon: Home },
-    { href: '/sections', label: 'Stores', icon: LayoutGrid }, // "Stores" now points to /sections
+    { href: '/categories', label: 'Stores', icon: LayoutGrid }, // "Stores" now points to /categories
     { href: '/account', label: 'Account', icon: User },
     { href: '/help', label: 'Help', icon: HelpCircle },
     { href: '/settings', label: 'Settings', icon: Settings },
@@ -49,14 +49,19 @@ export function BottomNavBar() {
   if (pathname === '/') {
     return null;
   }
+  // Hide BottomNavBar on the new categories page if it has its own fixed/sticky header/footer
+  if (pathname === '/categories') {
+    // return null; // Keeping it for now as the new categories page might not have full nav
+  }
+
 
   // Logic to determine if Home icon should be active
   const isHomePageActive = (itemHref: string, itemLabel: string) => {
     if (itemLabel === 'Home') {
       // If current path matches the specific section's home path (e.g., /grocery)
       if (currentSectionConfig && pathname === currentSectionConfig.path) return true;
-      // If no specific section, and current path is /sections (which is now the main store hub)
-      if (!currentSectionConfig && pathname === '/sections') return true;
+      // If no specific section, and current path is /categories (which is now the main store hub)
+      if (!currentSectionConfig && pathname === '/categories') return true;
       // If on a sub-page of a current section (e.g. /grocery/product-id)
       if (currentSectionConfig && pathname.startsWith(currentSectionConfig.path + '/')) return true;
     }
