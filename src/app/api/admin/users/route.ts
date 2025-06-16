@@ -1,18 +1,19 @@
 
 // src/app/api/admin/users/route.ts
-import { supabase } from '@/data/supabase'; // Reverted to global client
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { SupabaseUser } from '@/types';
 
 // Helper to check admin role
-async function isAdmin(): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) {
     return { isAdmin: false, errorResponse: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -28,7 +29,10 @@ async function isAdmin(): Promise<{ isAdmin: boolean; errorResponse?: NextRespon
 }
 
 export async function GET(req: NextRequest) {
-  const adminCheck = await isAdmin();
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }

@@ -1,18 +1,19 @@
 
 // src/app/api/admin/settings/route.ts
-import { supabase } from '@/data/supabase'; // Reverted to global client
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { AnnouncementSetting } from '@/types';
 
 // Helper to check admin role
-async function isAdmin(): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) {
     return { isAdmin: false, errorResponse: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -30,7 +31,10 @@ async function isAdmin(): Promise<{ isAdmin: boolean; errorResponse?: NextRespon
 const ANNOUNCEMENT_KEY = 'announcement_banner';
 
 export async function GET(req: NextRequest) {
-  const adminCheck = await isAdmin();
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }
@@ -43,11 +47,10 @@ export async function GET(req: NextRequest) {
       .from('app_settings')
       .select('key, value')
       .eq('key', ANNOUNCEMENT_KEY)
-      .maybeSingle(); // Use maybeSingle as the setting might not exist yet
+      .maybeSingle(); 
 
     if (error) {
       console.error('Error fetching app settings:', error);
-      // Check if table does not exist (code 42P01 for PostgreSQL)
       if (error.code === '42P01') {
          return NextResponse.json({ error: "The 'app_settings' table does not exist. Please create it in your database.", 
                                      hint: "Table structure: key TEXT PRIMARY KEY, value JSONB, updated_at TIMESTAMPTZ DEFAULT NOW()" }, { status: 500 });
@@ -56,8 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (!data) {
-      // No setting found, return a default or indicate not found
-      return NextResponse.json({ [ANNOUNCEMENT_KEY]: { message: '', enabled: false } }, { status: 200 }); // Return default if not found
+      return NextResponse.json({ [ANNOUNCEMENT_KEY]: { message: '', enabled: false } }, { status: 200 });
     }
 
     return NextResponse.json({ [data.key]: data.value as AnnouncementSetting });
@@ -70,7 +72,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const adminCheck = await isAdmin();
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error saving app settings:', error);
-      if (error.code === '42P01') { // Table does not exist
+      if (error.code === '42P01') { 
          return NextResponse.json({ error: "The 'app_settings' table does not exist. Please create it.", 
                                      hint: "Table structure: key TEXT PRIMARY KEY, value JSONB, updated_at TIMESTAMPTZ DEFAULT NOW()" }, { status: 500 });
       }

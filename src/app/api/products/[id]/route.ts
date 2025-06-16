@@ -1,14 +1,16 @@
 
-import { supabase } from '@/data/supabase'; // Reverted to global client
+// src/app/api/products/[id]/route.ts
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -21,7 +23,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin()) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -56,9 +61,12 @@ export async function DELETE(
         if (img.image_url && !img.image_url.startsWith('https://placehold.co')) {
           try {
             const url = new URL(img.image_url);
+            // Assuming bucket name is 'product-images' and path is '<supabase-project-ref>/storage/v1/object/public/product-images/<product_id>/<filename>'
+            // The path that `supabase.storage.from('product-images').remove()` expects is relative to the bucket, e.g., '<product_id>/<filename>'
             const pathSegments = url.pathname.split('/');
-            if (pathSegments.length > 6 && pathSegments[5] === 'product-images') { // supabase-project-ref/storage/v1/object/public/product-images/...
-              imagePathsToDelete.push(pathSegments.slice(6).join('/'));
+            const bucketNameIndex = pathSegments.indexOf('product-images');
+            if (bucketNameIndex !== -1 && bucketNameIndex < pathSegments.length -1 ) {
+              imagePathsToDelete.push(pathSegments.slice(bucketNameIndex + 1).join('/'));
             } else {
                console.warn(`Could not parse path from image URL for deletion: ${img.image_url}`);
             }
@@ -96,7 +104,10 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin()) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -115,7 +126,6 @@ export async function PUT(
     const imageFile = formData.get('imageFile') as File | null;
     const stockStr = formData.get('stock') as string | null; 
 
-
     if (!name || !priceStr || !category_id_str || !stockStr) { 
       return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
@@ -131,7 +141,6 @@ export async function PUT(
      if (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '' && isNaN(brand_id as number)) {
         return NextResponse.json({ error: 'Invalid numeric value for brand_id' }, { status: 400 });
     }
-
 
     const productUpdatePayload: {
       name: string;
@@ -152,7 +161,6 @@ export async function PUT(
       data_ai_hint: dataAiHint || name.toLowerCase().split(" ")[0] || "product",
       updated_at: new Date().toISOString(),
     };
-
 
     const { data: updatedProductData, error: productUpdateError } = await supabase
       .from('products')
@@ -192,8 +200,9 @@ export async function PUT(
             try {
               const url = new URL(img.image_url);
               const pathSegments = url.pathname.split('/');
-              if (pathSegments.length > 6 && pathSegments[5] === 'product-images') {
-                return pathSegments.slice(6).join('/');
+              const bucketNameIndex = pathSegments.indexOf('product-images');
+              if (bucketNameIndex !== -1 && bucketNameIndex < pathSegments.length -1 ) {
+                 return pathSegments.slice(bucketNameIndex + 1).join('/');
               }
             } catch (e) { console.warn(`Invalid old image URL format: ${img.image_url}`); }
           }
@@ -210,11 +219,12 @@ export async function PUT(
       }
 
       const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const newFilePath = `product-images/${productId}/${Date.now()}-${sanitizedFileName}`; // Changed to subfolder
+      const newFilePath = `${productId}/${Date.now()}-${sanitizedFileName}`; 
+      // Storage path for product-images bucket: <product_id>/<timestamp>-<filename>
 
       const { error: uploadErr } = await supabase.storage
         .from('product-images')
-        .upload(newFilePath, imageFile, { upsert: true, contentType: imageFile.type }); // Changed to true
+        .upload(newFilePath, imageFile, { upsert: true, contentType: imageFile.type }); 
 
       if (uploadErr) {
         console.error('New image upload error during update:', uploadErr);
@@ -260,7 +270,6 @@ export async function PUT(
         console.error('Failed to refetch product after update/image handling:', finalProductFetchError);
         return NextResponse.json({ error: 'Failed to retrieve final product data after update.'}, {status: 500});
     }
-
 
     return NextResponse.json({ success: true, product: finalProductData });
 

@@ -1,56 +1,17 @@
 
 // src/app/api/admin/analytics/route.ts
-import { supabase } from '@/data/supabase'; // Reverted to global client
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // IMPORTANT: You need to create these PostgreSQL functions/views in your Supabase project.
-// Example SQL for these views/functions:
-
-// -- revenue_over_time (Example: daily revenue for last 30 days)
-// CREATE OR REPLACE VIEW revenue_over_time AS
-// SELECT
-//   date_trunc('day', created_at)::date AS day,
-//   SUM(total_amount) AS revenue
-// FROM orders
-// WHERE status = 'delivered' AND created_at >= NOW() - INTERVAL '30 days'
-// GROUP BY 1
-// ORDER BY 1;
-
-// -- inventory_status (Example: count of products by category, or low stock items)
-// CREATE OR REPLACE VIEW inventory_status AS
-// SELECT
-//   c.name AS category_name,
-//   COUNT(p.id) AS product_count,
-//   SUM(CASE WHEN p.stock < 10 THEN 1 ELSE 0 END) as low_stock_count
-// FROM products p
-// JOIN categories c ON p.category_id = c.id
-// GROUP BY c.name;
-
-// -- new_signups_over_time (Example: daily new user signups for last 30 days)
-// CREATE OR REPLACE VIEW new_signups_over_time AS
-// SELECT
-//   date_trunc('day', created_at)::date AS day,
-//   COUNT(id) AS signup_count
-// FROM users -- or your profiles table if user creation is tracked there
-// WHERE created_at >= NOW() - INTERVAL '30 days'
-// GROUP BY 1
-// ORDER BY 1;
-
-// -- Suggested View for active_users_count_last_30_days
-// CREATE OR REPLACE VIEW active_users_count_last_30_days AS
-// SELECT COUNT(id) as count
-// FROM users
-// WHERE created_at >= NOW() - INTERVAL '30 days';
-
-// -- Suggested View for orders_count_last_30_days
-// CREATE OR REPLACE VIEW orders_count_last_30_days AS
-// SELECT COUNT(id) as count
-// FROM orders
-// WHERE created_at >= NOW() - INTERVAL '30 days';
-
+// Example SQL for these views/functions can be found in comments below or on the Admin Dashboard page.
 
 export async function GET(req: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
   console.log('API /api/admin/analytics: Received GET request.');
   try {
     console.log('API /api/admin/analytics: Attempting to get user session.');
@@ -142,3 +103,46 @@ export async function GET(req: NextRequest) {
   }
 }
     
+// -- Example SQL for Supabase Views (create these in your Supabase SQL editor) --
+
+// -- revenue_over_time (Example: daily revenue for last 30 days from 'delivered' orders)
+// CREATE OR REPLACE VIEW revenue_over_time AS
+// SELECT
+//   date_trunc('day', created_at)::date AS day,
+//   SUM(total_amount) AS revenue
+// FROM orders
+// WHERE status = 'delivered' AND created_at >= NOW() - INTERVAL '30 days'
+// GROUP BY 1
+// ORDER BY 1;
+
+// -- inventory_status (Example: count of products by category, and low stock items)
+// CREATE OR REPLACE VIEW inventory_status AS
+// SELECT
+//   c.name AS category_name,
+//   COUNT(p.id) AS product_count,
+//   SUM(CASE WHEN p.stock < 10 THEN 1 ELSE 0 END) as low_stock_count
+// FROM products p
+// JOIN categories c ON p.category_id = c.id
+// GROUP BY c.name;
+
+// -- new_signups_over_time (Example: daily new user signups for last 30 days)
+// CREATE OR REPLACE VIEW new_signups_over_time AS
+// SELECT
+//   date_trunc('day', created_at)::date AS day,
+//   COUNT(id) AS signup_count
+// FROM users -- Assuming 'users' is your profiles table linked to auth.users
+// WHERE created_at >= NOW() - INTERVAL '30 days'
+// GROUP BY 1
+// ORDER BY 1;
+
+// -- active_users_count_last_30_days (Example: count of users created in the last 30 days)
+// CREATE OR REPLACE VIEW active_users_count_last_30_days AS
+// SELECT COUNT(id) as count
+// FROM users -- Assuming 'users' is your profiles table
+// WHERE created_at >= NOW() - INTERVAL '30 days';
+
+// -- orders_count_last_30_days (Example: count of orders placed in the last 30 days)
+// CREATE OR REPLACE VIEW orders_count_last_30_days AS
+// SELECT COUNT(id) as count
+// FROM orders
+// WHERE created_at >= NOW() - INTERVAL '30 days';

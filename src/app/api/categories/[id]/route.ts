@@ -1,15 +1,16 @@
 
 // src/app/api/categories/[id]/route.ts
-import { supabase } from '@/data/supabase'; // Reverted to global client
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -22,7 +23,10 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin()) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -40,7 +44,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Category name is required.' }, { status: 400 });
     }
     
-    // Check if category exists before updating
     const { data: existingCategory, error: fetchError } = await supabase
         .from('categories')
         .select('id')
@@ -61,7 +64,7 @@ export async function PUT(
       .single();
 
     if (error) {
-      if (error.code === '23505') { // Unique violation
+      if (error.code === '23505') { 
         return NextResponse.json({ error: `Category name '${name.trim()}' already exists.` }, { status: 409 });
       }
       console.error(`Error updating category ${categoryId}:`, error);
@@ -84,7 +87,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin()) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -96,7 +102,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid category ID.' }, { status: 400 });
     }
     
-    // Check if category exists before deleting
     const { data: existingCategory, error: fetchError } = await supabase
         .from('categories')
         .select('id')
@@ -113,8 +118,7 @@ export async function DELETE(
       .eq('id', categoryId);
 
     if (error) {
-      // Check for foreign key violation (e.g., if products are still linked to this category)
-      if (error.code === '23503') { // foreign_key_violation
+      if (error.code === '23503') { 
         return NextResponse.json({ error: 'Cannot delete category: It is currently associated with existing products. Please reassign or delete these products first.' }, { status: 409 });
       }
       console.error(`Error deleting category ${categoryId}:`, error);

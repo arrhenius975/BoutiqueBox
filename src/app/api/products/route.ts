@@ -1,14 +1,16 @@
 
-import { supabase } from '@/data/supabase'; // Reverted to global client
+// src/app/api/products/route.ts
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -17,9 +19,11 @@ async function isAdmin(): Promise<boolean> {
   return !profileError && profile?.role === 'admin';
 }
 
-
 export async function POST(req: NextRequest) {
-  if (!await isAdmin()) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -38,10 +42,15 @@ export async function POST(req: NextRequest) {
     if (!name || !priceStr || !category_id_str || !stockStr) { 
         return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
-    if (imageFile && imageFile.size === 0) {
+    if (imageFile && imageFile.size === 0) { // Check if an image file was provided but is empty
         return NextResponse.json({ error: 'Image file cannot be empty if provided.' }, { status: 400 });
     }
-
+    if (!imageFile && !formData.has('currentImageUrl')) { // Check if no new image and no existing one (for POST, imageFile is generally expected)
+      // For POST, we usually expect an image. If currentImageUrl logic were here, it'd be for PUT.
+      // So, if no imageFile, it's typically an error for a new product unless placeholders are auto-generated
+      // and image is truly optional, which is not the case here as per ProductForm logic.
+       return NextResponse.json({ error: 'Product image is required for new products.' }, { status: 400 });
+    }
 
     const price = parseFloat(priceStr);
     const stock = parseInt(stockStr, 10);
@@ -88,10 +97,11 @@ export async function POST(req: NextRequest) {
 
     if (imageFile && imageFile.size > 0) {
         const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-        const filePath = `product-images/${productData.id}/${Date.now()}-${sanitizedFileName}`;
+        // Corrected filePath for Supabase Storage: bucket_name/product_id/file_name
+        const filePath = `${productData.id}/${Date.now()}-${sanitizedFileName}`; // Path relative to the bucket
 
         const { error: uploadErr } = await supabase.storage
-            .from('product-images')
+            .from('product-images') // Bucket name
             .upload(filePath, imageFile, { upsert: true, contentType: imageFile.type });
 
         if (uploadErr) {
@@ -100,7 +110,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { data: urlData } = supabase.storage
-            .from('product-images')
+            .from('product-images') // Bucket name
             .getPublicUrl(filePath);
 
         if (!urlData || !urlData.publicUrl) {
@@ -120,17 +130,43 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: `Product created, image uploaded, but linking image to product failed: ${productImageInsertError.message}. Product ID: ${productData.id}` }, { status: 500 });
         }
     } else {
+        // If no imageFile, link the default placeholder image
          const { error: placeholderImageInsertError } = await supabase.from('product_images').insert({
             product_id: productData.id,
-            image_url: publicUrl,
+            image_url: publicUrl, // This is the placeholder URL
             is_primary: true
         });
          if (placeholderImageInsertError) {
             console.warn('Failed to insert placeholder image URL for product:', productData.id, placeholderImageInsertError);
+            // Not returning error here as product creation was successful, but image linking might need attention.
         }
     }
+    
+    // Refetch the product with its category name for the response
+    const { data: finalProductData, error: finalFetchError } = await supabase
+      .from('products')
+      .select(\`
+        id,
+        name,
+        description,
+        price,
+        stock,
+        category_id ( id, name ),
+        brand_id ( id, name ),
+        product_images ( image_url, is_primary ),
+        data_ai_hint
+      \`)
+      .eq('id', productData.id)
+      .single();
 
-    return NextResponse.json({ success: true, product: { ...productData, image: publicUrl, category: { name: category_id_str } } });
+    if (finalFetchError || !finalProductData) {
+        console.error('Failed to refetch product details after creation:', finalFetchError);
+        // Return the initially created productData if refetch fails, but log the issue.
+        return NextResponse.json({ success: true, product: { ...productData, image: publicUrl, category: { name: 'Category name fetch pending'} } });
+    }
+
+
+    return NextResponse.json({ success: true, product: finalProductData });
   } catch (e: unknown) {
     console.error('POST /api/products unexpected error:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
@@ -139,6 +175,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
   try {
     const { data, error } = await supabase
       .from('products')
