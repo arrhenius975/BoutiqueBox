@@ -1,16 +1,17 @@
 
 // src/app/api/admin/orders/[orderId]/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-async function isAdmin(req: NextRequest): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) {
     return { isAdmin: false, errorResponse: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -29,7 +30,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { orderId: string } }
 ) {
-  const adminCheck = await isAdmin(req);
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }
@@ -73,4 +75,3 @@ export async function PUT(
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-```

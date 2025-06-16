@@ -1,15 +1,16 @@
 
 // src/app/api/categories/[id]/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -22,7 +23,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin(req)) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -85,7 +87,8 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin(req)) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 

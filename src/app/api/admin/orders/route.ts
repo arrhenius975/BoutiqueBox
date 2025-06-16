@@ -1,17 +1,18 @@
 
 // src/app/api/admin/orders/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { DisplayOrder } from '@/types';
 
 // Helper to check admin role (with enhanced logging)
-async function isAdminCheck(req: NextRequest): Promise<{ isAdminUser: boolean; errorResponse?: NextResponse; userId?: string; userEmail?: string; }> {
+async function isAdminCheck(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdminUser: boolean; errorResponse?: NextResponse; userId?: string; userEmail?: string; }> {
   console.log('isAdminCheck: Attempting to get user session.');
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
   if (authError) {
-    console.error('isAdminCheck: Auth error when calling supabase.auth.getUser():', authError.message);
+    console.error('isAdminCheck: Auth error when calling supabaseClient.auth.getUser():', authError.message);
     return { isAdminUser: false, errorResponse: NextResponse.json({ error: `Auth service error: ${authError.message}` }, { status: 500 }) };
   }
   if (!user) {
@@ -21,7 +22,7 @@ async function isAdminCheck(req: NextRequest): Promise<{ isAdminUser: boolean; e
   console.log(`isAdminCheck: Authenticated user found: ${user.email} (Auth ID: ${user.id})`);
 
   console.log(`isAdminCheck: Fetching profile for auth_id ${user.id}`);
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -47,8 +48,9 @@ async function isAdminCheck(req: NextRequest): Promise<{ isAdminUser: boolean; e
 }
 
 export async function GET(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   console.log('API /api/admin/orders: Received GET request.');
-  const authCheck = await isAdminCheck(req);
+  const authCheck = await isAdminCheck(supabase);
   if (!authCheck.isAdminUser) {
     return authCheck.errorResponse || NextResponse.json({ error: 'Authentication or Authorization failed.' }, { status: 403 });
   }

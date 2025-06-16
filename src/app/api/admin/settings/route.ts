@@ -1,18 +1,19 @@
 
 // src/app/api/admin/settings/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { AnnouncementSetting } from '@/types';
 
 // Helper to check admin role
-async function isAdmin(req: NextRequest): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) {
     return { isAdmin: false, errorResponse: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }) };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -30,7 +31,8 @@ async function isAdmin(req: NextRequest): Promise<{ isAdmin: boolean; errorRespo
 const ANNOUNCEMENT_KEY = 'announcement_banner';
 
 export async function GET(req: NextRequest) {
-  const adminCheck = await isAdmin(req);
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }
@@ -70,7 +72,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const adminCheck = await isAdmin(req);
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  const adminCheck = await isAdmin(supabase);
   if (!adminCheck.isAdmin && adminCheck.errorResponse) {
     return adminCheck.errorResponse;
   }

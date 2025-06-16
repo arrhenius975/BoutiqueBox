@@ -1,15 +1,16 @@
 
 // src/app/api/categories/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -19,7 +20,8 @@ async function isAdmin(req: NextRequest): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!await isAdmin(req)) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
 
@@ -53,7 +55,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // No admin check for GET, categories might be needed by non-admins too (e.g. product form)
+  // GETting categories is public, no admin check needed here.
+  // However, we still use createRouteHandlerClient for consistency if we decided to make it protected later or for other reasons.
+  // For a truly public endpoint, the global supabase client from `src/data/supabase` could also be used.
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   try {
     const { data, error } = await supabase
       .from('categories')

@@ -1,14 +1,15 @@
 
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Helper to check admin role
-async function isAdmin(req: NextRequest): Promise<boolean> {
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
   if (authError || !user) return false;
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile, error: profileError } = await supabaseClient
     .from('users')
     .select('role')
     .eq('auth_id', user.id)
@@ -21,7 +22,8 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin(req)) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -96,7 +98,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  if (!await isAdmin(req)) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+  if (!await isAdmin(supabase)) {
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
   try {
@@ -158,7 +161,7 @@ export async function PUT(
       .from('products')
       .update(productUpdatePayload)
       .eq('id', productId)
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -168,7 +171,7 @@ export async function PUT(
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
-      `)
+      \`)
       .single();
 
     if (productUpdateError || !updatedProductData) {
@@ -247,7 +250,7 @@ export async function PUT(
     // Refetch product data to include the potentially new image URL in the response
     const { data: finalProductData, error: finalProductFetchError } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -257,7 +260,7 @@ export async function PUT(
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
-      `)
+      \`)
       .eq('id', productId)
       .single();
 

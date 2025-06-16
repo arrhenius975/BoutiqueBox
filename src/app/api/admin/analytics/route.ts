@@ -1,6 +1,7 @@
 
 // src/app/api/admin/analytics/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -51,6 +52,7 @@ import type { NextRequest } from 'next/server';
 
 
 export async function GET(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   console.log('API /api/admin/analytics: Received GET request.');
   try {
     console.log('API /api/admin/analytics: Attempting to get user session.');

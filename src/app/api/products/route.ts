@@ -1,9 +1,31 @@
 
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Helper to check admin role
+async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
+  const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+  if (authError || !user) return false;
+
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('users')
+    .select('role')
+    .eq('auth_id', user.id)
+    .single();
+  
+  return !profileError && profile?.role === 'admin';
+}
+
+
 export async function POST(req: NextRequest) {
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+
+  if (!await isAdmin(supabase)) {
+    return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
+  }
+
   try {
     const formData = await req.formData();
     const name = formData.get('name') as string;
@@ -132,10 +154,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  // GETting products is public.
+  const supabase = createRouteHandlerClient({ cookies: () => cookies() });
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -145,7 +169,7 @@ export async function GET(req: NextRequest) {
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
-      `)
+      \`)
       .order('created_at', { ascending: false });
 
 
