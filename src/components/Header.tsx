@@ -2,14 +2,14 @@
 "use client";
 
 import Link from 'next/link';
-import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn, Settings as SettingsIcon, HelpCircle, LayoutGrid, Layers } from 'lucide-react';
+import { ShoppingCart, Heart, ShoppingBag, Lightbulb, MapPin, Search as SearchIcon, Filter, User, LogIn, Settings as SettingsIcon, HelpCircle, LayoutGrid, Layers, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAppContext } from '@/contexts/AppContext';
 import type { SectionCategory, SearchFilterType } from '@/types';
 import { cn } from '@/lib/utils';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import {
   DropdownMenu,
@@ -48,6 +48,7 @@ export function Header() {
     isLoadingAuth,
   } = useAppContext();
   const pathname = usePathname();
+  const router = useRouter();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -66,10 +67,15 @@ export function Header() {
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood') ||
                            pathname.startsWith('/category/');
+  
+  const isProductDetailPage = 
+    pathname.split('/').length === 4 && // e.g., /grocery/product-id/
+    (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || pathname.startsWith('/category/'));
+
 
   useEffect(() => {
     // AppContext handles resetting search term based on path changes logic
-  }, [pathname, setSearchTerm]); // setSearchTerm might be re-evaluated by AppContext logic
+  }, [pathname, setSearchTerm]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -94,21 +100,20 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 50;
-  const yOffsetForArc = -10;
-  const angleSpan = numCategories > 1 ? 180 : 0;
+  const categoryArcRadius = 50; 
+  const yOffsetForArc = 10; 
+  const angleSpan = numCategories > 1 ? Math.min(120, numCategories * 30) : 0; 
   const startAngle = numCategories > 1 ? -angleSpan / 2 : 0;
-  const iconPixelWidth = 48;
+  const iconPixelWidth = 40; 
 
-  const showCategoryArc = currentSection && currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/');
-
+  const showCategoryArc = currentSection && currentSectionConfig && categoriesList.length > 0 && !pathname.startsWith('/category/') && !isProductDetailPage;
 
   return (
     <header
       ref={headerRef}
       className={cn(
         "sticky top-0 z-40 w-full backdrop-blur supports-[backdrop-filter]:bg-opacity-65",
-        "rounded-b-[25px]", // Adjusted rounding
+        "rounded-b-[25px]",
         currentSectionConfig
           ? "bg-[hsl(var(--header-bg-hsl)/0.85)] text-[hsl(var(--header-fg-hsl))] supports-[backdrop-filter]:bg-[hsl(var(--header-bg-hsl)/0.65)]"
           : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65",
@@ -118,6 +123,11 @@ export function Header() {
     >
       <div className="container flex h-16 items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
+          {isProductDetailPage ? (
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className={cn(currentSectionConfig ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground", "mr-1 md:mr-2")}>
+              <ArrowLeft className="h-6 w-6" />
+            </Button>
+          ) : null}
           <Link
             href={sectionPath}
             className={cn(
@@ -128,7 +138,7 @@ export function Header() {
             <ShoppingBag className="h-7 w-7" />
             <span className="font-headline text-xl md:text-2xl font-bold">{sectionName}</span>
           </Link>
-          {currentSectionConfig && (
+          {currentSectionConfig && !isProductDetailPage && (
             <div className="hidden md:flex items-center gap-1 text-sm opacity-80">
               <MapPin className="h-4 w-4" />
               <span>Delivering to: CA, USA</span>
@@ -136,7 +146,7 @@ export function Header() {
           )}
         </div>
 
-        {isAppFeaturePage && (
+        {isAppFeaturePage && !isProductDetailPage && (
           <div className="flex-1 min-w-0 px-2 md:px-4">
             <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto flex items-center">
               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -152,7 +162,7 @@ export function Header() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {currentSectionConfig && (
+              {(currentSectionConfig || pathname.startsWith('/category/')) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -211,7 +221,7 @@ export function Header() {
           {desktopNavItems.length > 0 && <div className={cn("hidden md:block h-6 w-px mx-2", currentSectionConfig ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
 
           <div className="flex items-center gap-x-0.5 sm:gap-x-1">
-            {(currentSectionConfig || pathname.startsWith('/category/')) && (
+            {(currentSectionConfig || pathname.startsWith('/category/')) && !isProductDetailPage && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -287,8 +297,8 @@ export function Header() {
       </div>
 
       {showCategoryArc && (
-         <div className="relative h-[60px] sm:h-[70px] flex justify-center items-start mt-1 mb-2 overflow-hidden">
-          <div className="relative w-[280px] h-[110px] sm:w-[360px] sm:h-[110px] md:w-[420px] md:h-[110px]">
+         <div className="relative h-[70px] sm:h-[80px] flex justify-center items-start mt-1 mb-3 overflow-hidden">
+          <div className="relative w-[300px] h-[120px] sm:w-[380px] sm:h-[120px] md:w-[450px] md:h-[120px]">
             {categoriesList.map((category, index) => {
               const angle = numCategories === 1 ? 0 : (startAngle + (index / (Math.max(1, numCategories - 1))) * angleSpan);
               const radian = angle * (Math.PI / 180);
@@ -296,14 +306,14 @@ export function Header() {
               const x = categoryArcRadius * Math.sin(radian);
               const y = yOffsetForArc + categoryArcRadius * Math.cos(radian);
 
-              const iconSizeClass = "w-10 h-10 sm:w-12 sm:h-12";
+              const iconSizeClass = "w-8 h-8 sm:w-10 sm:h-10";
 
               return (
                 <button
                   key={category.value}
                   onClick={() => setSelectedCategory(category.value)}
                   className={cn(
-                    "absolute p-1.5 sm:p-2 rounded-full transition-all duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-2",
+                    "absolute p-1 sm:p-1.5 rounded-full transition-all duration-200 ease-in-out hover:scale-110 focus:outline-none focus:ring-2",
                     currentSectionConfig ? "focus:ring-[hsl(var(--ring))]" : "focus:ring-ring",
                     selectedCategory === category.value
                       ? (currentSectionConfig ? 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]' : 'bg-primary text-primary-foreground shadow-md scale-110')
@@ -312,18 +322,18 @@ export function Header() {
                     "flex flex-col items-center justify-center"
                   )}
                   style={{
-                    left: \`calc(50% + \${x}px - \${iconPixelWidth / 2}px)\`,
-                    top: \`\${y}px\`,
-                    transform: \`rotate(\${angle}deg)\`,
+                    left: `calc(50% + ${x}px - ${iconPixelWidth / 2}px)`,
+                    top: `${y}px`,
+                    transform: `rotate(${angle}deg)`,
                   }}
                   title={category.label}
                 >
                   <category.icon
                     className={cn(
-                      "h-4 w-4 sm:h-5 sm:h-5",
+                      "h-3 w-3 sm:h-4 sm:h-4",
                       selectedCategory === category.value ? '' : ''
-                    )} style={{transform: \`rotate(\${-angle}deg)\`}} />
-                   <span className="text-[0.6rem] sm:text-[0.65rem] font-medium truncate mt-0.5" style={{transform: \`rotate(\${-angle}deg)\`}}>{category.label}</span>
+                    )} style={{transform: `rotate(${-angle}deg)`}} />
+                   <span className="text-[0.5rem] sm:text-[0.55rem] font-medium truncate mt-0.5" style={{transform: `rotate(${-angle}deg)`}}>{category.label}</span>
                 </button>
               );
             })}
