@@ -2,8 +2,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Truck, Zap, MapPin, Check, ShoppingBag } from 'lucide-react'; // Added ShoppingBag
-import Link from 'next/link'; // Added Link for navigation
+import { ChevronLeft, ChevronRight, Truck, Zap, MapPin, Check, ShoppingBag } from 'lucide-react';
+import Link from 'next/link'; 
 
 const BoutiqueBoxLanding = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -35,7 +35,6 @@ const BoutiqueBoxLanding = () => {
     setIsVisible(true);
   }, []);
 
-  // Handle wheel scroll for slide navigation
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (isScrolling.current) return;
@@ -45,14 +44,14 @@ const BoutiqueBoxLanding = () => {
 
       const { scrollTop, scrollHeight, clientHeight } = currentSlideElement;
       const isAtTop = scrollTop === 0;
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; // Added -1 for robustness
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 1; 
 
-      if (e.deltaY > 0) { // Scrolling down
+      if (e.deltaY > 0) { 
         if (isAtBottom && currentSlide < slides.length - 1) {
           e.preventDefault();
           nextSlide();
         }
-      } else { // Scrolling up
+      } else { 
         if (isAtTop && currentSlide > 0) {
           e.preventDefault();
           prevSlide();
@@ -62,11 +61,10 @@ const BoutiqueBoxLanding = () => {
 
     const container = containerRef.current;
     if (container) {
-      // Add type assertion for options if needed, or ensure it's compatible
       container.addEventListener('wheel', handleWheel, { passive: false } as EventListenerOptions);
       return () => container.removeEventListener('wheel', handleWheel, { passive: false } as EventListenerOptions);
     }
-  }, [currentSlide]); // Added slides.length to dependency array for robustness
+  }, [currentSlide, slides.length]); // Added slides.length
 
   const nextSlide = () => {
     if (isScrolling.current) return;
@@ -76,7 +74,7 @@ const BoutiqueBoxLanding = () => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       isScrolling.current = false;
-    }, 800); // Animation duration
+    }, 800); 
   };
 
   const prevSlide = () => {
@@ -87,7 +85,7 @@ const BoutiqueBoxLanding = () => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       isScrolling.current = false;
-    }, 800); // Animation duration
+    }, 800); 
   };
 
   const goToSlide = (index: number) => {
@@ -98,15 +96,13 @@ const BoutiqueBoxLanding = () => {
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       isScrolling.current = false;
-    }, 800); // Animation duration
+    }, 800); 
   };
 
   const WelcomeSlide = () => (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-green-800 to-teal-900 relative overflow-hidden">
       <div className="absolute inset-0 bg-black bg-opacity-30"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
-      
-      {/* Decorative elements */}
       <div className="absolute top-20 left-20 w-32 h-32 bg-white bg-opacity-10 rounded-full blur-xl"></div>
       <div className="absolute bottom-32 right-32 w-48 h-48 bg-emerald-400 bg-opacity-10 rounded-full blur-2xl"></div>
       
@@ -121,14 +117,14 @@ const BoutiqueBoxLanding = () => {
             Experience premium products and personalized service that transforms your everyday routine 
             into something extraordinary.
           </p>
-          <button 
-            onClick={nextSlide}
-            className="bg-white text-green-900 px-8 py-4 rounded-full font-semibold text-lg hover:bg-emerald-50 transition-all duration-300 transform hover:scale-105 shadow-2xl"
-          >
-            Discover More
-          </button>
+          <Link href="/categories" passHref>
+            <button 
+              className="bg-white text-green-900 px-8 py-4 rounded-full font-semibold text-lg hover:bg-emerald-50 transition-all duration-300 transform hover:scale-105 shadow-2xl"
+            >
+              Discover More
+            </button>
+          </Link>
           
-          {/* Scroll indicator */}
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white text-sm animate-bounce">
             <div className="flex flex-col items-center space-y-2">
               <span>Scroll Down</span>
@@ -144,7 +140,6 @@ const BoutiqueBoxLanding = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-stone-100 py-8">
       <div className="container mx-auto px-8 py-16">
         <div className="grid md:grid-cols-2 gap-16 items-center min-h-[80vh]">
-          {/* Left: Image */}
           <div className="relative">
             <div className="aspect-[3/4] bg-gradient-to-br from-emerald-200 to-green-300 rounded-3xl overflow-hidden shadow-2xl">
               <img 
@@ -159,7 +154,6 @@ const BoutiqueBoxLanding = () => {
             </div>
           </div>
 
-          {/* Right: Content */}
           <div className="space-y-8">
             <div>
               <h2 className="text-4xl md:text-6xl font-serif font-bold uppercase text-gray-900 leading-tight mb-6">
@@ -167,7 +161,6 @@ const BoutiqueBoxLanding = () => {
                 <span className="text-emerald-600 block">We can make that easy for you.</span>
               </h2>
             </div>
-
             <div className="space-y-6">
               <h3 className="text-2xl font-semibold text-gray-800 mb-4">Why Choose Us?</h3>
               <div className="space-y-4">
@@ -188,7 +181,6 @@ const BoutiqueBoxLanding = () => {
           </div>
         </div>
         
-        {/* Additional content for scrolling */}
         <div className="mt-24 py-12 border-t border-gray-300">
           <div className="text-center space-y-8">
             <h3 className="text-3xl font-serif text-gray-800">Our Promise to You</h3>
@@ -300,16 +292,14 @@ const BoutiqueBoxLanding = () => {
                 Join thousands of satisfied customers who have transformed their lifestyle with BoutiqueBox.
               </p>
               
-              {/* Removed the Individual and Family Plan cards section */}
-               
-               {/* Add a link to explore stores at the very bottom of the last slide */}
                 <div className="mt-16">
-                    <a
-                        href="/sections" // Link to your sections page
+                  <Link href="/categories" passHref>
+                    <button
                         className="inline-block bg-white text-gray-900 px-10 py-5 rounded-full font-bold text-xl hover:bg-gray-200 transition-all duration-300 transform hover:scale-105 shadow-2xl"
                     >
                         Explore Our Stores
-                    </a>
+                    </button>
+                  </Link>
                 </div>
             </div>
           </div>
@@ -320,7 +310,6 @@ const BoutiqueBoxLanding = () => {
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Navigation */}
       <nav className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
         <div className="bg-white bg-opacity-90 backdrop-blur-lg rounded-full px-4 py-2 shadow-lg border border-white border-opacity-30">
           <div className="flex space-x-4">
@@ -334,49 +323,46 @@ const BoutiqueBoxLanding = () => {
                     : 'text-gray-700 hover:text-emerald-600'
                 }`}
               >
-                {slide.title.split(' ')[0]} {/* Show first word of title */}
+                {slide.title.split(' ')[0]}
               </button>
             ))}
           </div>
         </div>
       </nav>
 
-      {/* Slide Navigation Arrows - Top (Previous) */}
       <button 
         onClick={prevSlide}
         disabled={currentSlide === 0}
-        className={`fixed left-1/2 top-8 transform -translate-x-1/2 -translate-y-1/2 z-40 backdrop-blur-lg rounded-full p-4 transition-all duration-300 ${ // Adjusted top positioning
+        className={`fixed left-1/2 top-8 transform -translate-x-1/2 -translate-y-1/2 z-40 backdrop-blur-lg rounded-full p-4 transition-all duration-300 ${ 
           currentSlide === 0 
             ? 'bg-gray-500 bg-opacity-20 text-gray-500 cursor-not-allowed opacity-50' 
             : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
         }`}
-        style={{ top: '5vh' }} // Fine-tune vertical position
+        style={{ top: '5vh' }}
       >
         <ChevronLeft className="w-6 h-6 transform rotate-90" />
       </button>
       
-      {/* Slide Navigation Arrows - Bottom (Next) */}
       <button 
         onClick={nextSlide}
         disabled={currentSlide === slides.length - 1}
-        className={`fixed left-1/2 bottom-8 transform -translate-x-1/2 translate-y-1/2 z-40 backdrop-blur-lg rounded-full p-4 transition-all duration-300 ${ // Adjusted bottom positioning
+        className={`fixed left-1/2 bottom-8 transform -translate-x-1/2 translate-y-1/2 z-40 backdrop-blur-lg rounded-full p-4 transition-all duration-300 ${ 
           currentSlide === slides.length - 1 
             ? 'bg-gray-500 bg-opacity-20 text-gray-500 cursor-not-allowed opacity-50' 
             : 'bg-white bg-opacity-20 text-white hover:bg-opacity-30'
         }`}
-        style={{ bottom: '15vh' }} // Fine-tune vertical position from bottom, above nav
+        style={{ bottom: '15vh' }}
       >
         <ChevronRight className="w-6 h-6 transform rotate-90" />
       </button>
 
-      {/* Slide Indicator Dots - Right Side */}
       <div className="fixed right-8 top-1/2 transform -translate-y-1/2 z-50">
         <div className="flex flex-col space-y-3">
           {slides.map((_, index) => (
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`w-3 h-8 rounded-full transition-all duration-300 ${ // Made taller for easier clicking
+              className={`w-3 h-8 rounded-full transition-all duration-300 ${
                 currentSlide === index 
                   ? 'bg-white shadow-lg scale-110' 
                   : 'bg-white bg-opacity-50 hover:bg-opacity-75'
@@ -387,27 +373,25 @@ const BoutiqueBoxLanding = () => {
         </div>
       </div>
 
-      {/* Slides Container */}
-      <div className="relative h-screen overflow-hidden"> {/* Main container for slides */}
+      <div className="relative h-screen overflow-hidden">
         <div 
           className="flex flex-col transition-transform duration-700 ease-in-out"
           style={{ transform: `translateY(-${currentSlide * 100}vh)` }}
         >
-          {/* Each slide wrapper needs to allow internal scrolling if content exceeds vh */}
           <div 
-            className="h-screen w-screen flex-shrink-0 overflow-y-auto" // Added w-screen
+            className="h-screen w-screen flex-shrink-0 overflow-y-auto"
             ref={(el) => slideRefs.current[0] = el}
           >
             <WelcomeSlide />
           </div>
           <div 
-            className="h-screen w-screen flex-shrink-0 overflow-y-auto" // Added w-screen
+            className="h-screen w-screen flex-shrink-0 overflow-y-auto"
             ref={(el) => slideRefs.current[1] = el}
           >
             <AboutSlide />
           </div>
           <div 
-            className="h-screen w-screen flex-shrink-0 overflow-y-auto" // Added w-screen
+            className="h-screen w-screen flex-shrink-0 overflow-y-auto"
             ref={(el) => slideRefs.current[2] = el}
           >
             <ServicesSlide />
@@ -415,9 +399,8 @@ const BoutiqueBoxLanding = () => {
         </div>
       </div>
 
-      {/* Sticky Button to Sections Page */}
       <Link
-        href="/sections"
+        href="/categories"
         className="fixed bottom-6 right-6 z-50 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors flex items-center justify-center group"
       >
         <ShoppingBag className="h-6 w-6" />
@@ -425,10 +408,8 @@ const BoutiqueBoxLanding = () => {
           Explore Stores
         </span>
       </Link>
-
     </div>
   );
 };
 
 export default BoutiqueBoxLanding;
-
