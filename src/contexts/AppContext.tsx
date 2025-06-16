@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SearchFilterType, SupabaseUser, AnnouncementSetting } from '@/types';
+import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SearchFilterType, SupabaseUser, AnnouncementSetting, SupabaseCategory } from '@/types';
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -9,11 +9,12 @@ import { generatePersonalizedRecommendations, type PersonalizedRecommendationsOu
 import { supabase } from '@/data/supabase';
 import type { User as AuthUser, Session } from '@supabase/supabase-js';
 
-// Import section-specific data
+// Import section-specific data (these might become less primary if dynamic categories take over)
 import { groceryProducts, groceryCategories } from '@/data/groceryProducts';
 import { cosmeticsProducts, cosmeticsCategories } from '@/data/cosmeticsProducts';
 import { fastfoodProducts, fastfoodCategories } from '@/data/fastfoodProducts';
 
+// This config is for the old static sections. It will be less used if dynamic categories become primary.
 const sectionsConfig: Record<AppSection, SectionConfig> = {
   grocery: {
     name: 'Grocery',
@@ -48,23 +49,33 @@ const sectionsConfig: Record<AppSection, SectionConfig> = {
       subtitle: 'Get your favorite burgers, pizzas, and sides in a flash.'
     }
   },
+  // Default/fallback for dynamic categories if needed, or remove if not applicable
+  tech: { name: 'Tech', path: '/category/tech', themeClass: '', products: [], categories: [], hero: { title: 'Tech Gadgets', subtitle: 'Latest tech.'}},
+  fashion: { name: 'Fashion', path: '/category/fashion', themeClass: '', products: [], categories: [], hero: { title: 'Fashion Trends', subtitle: 'Stylish apparel.'}},
+  literature: { name: 'Literature', path: '/category/literature', themeClass: '', products: [], categories: [], hero: { title: 'Books & More', subtitle: 'Explore new worlds.'}},
+  other: { name: 'Other', path: '/category/other', themeClass: '', products: [], categories: [], hero: { title: 'Various Items', subtitle: 'Browse diverse products.'}},
 };
 
 
 interface AppContextType {
   cart: CartItem[];
   wishlist: WishlistItem[];
-  viewedProducts: string[];
+  viewedProducts: string[]; // IDs of products viewed in the current context (dynamic category or old section)
   isCartOpen: boolean;
   isWishlistOpen: boolean;
   isRecommendationsModalOpen: boolean;
-  recommendations: Product[];
+  recommendations: Product[]; // Products recommended based on viewedProducts
   isLoadingRecommendations: boolean;
 
-  currentSection: AppSection | null;
+  // For old static sections (grocery, cosmetics, fastfood)
+  currentSection: AppSection | null; 
   currentSectionConfig: SectionConfig | null;
+  setCurrentSection: React.Dispatch<React.SetStateAction<AppSection | null>>;
+  setCurrentSectionConfig: React.Dispatch<React.SetStateAction<SectionConfig | null>>;
 
-  selectedCategory: ProductCategory | 'all';
+
+  // For sub-category filtering WITHIN a section or dynamic category page
+  selectedCategory: ProductCategory | 'all'; // This refers to sub-categories like 'meats', 'skincare'
   setSelectedCategory: (category: ProductCategory | 'all') => void;
 
   searchTerm: string;
@@ -101,7 +112,7 @@ interface AppContextType {
 
   openRecommendationsModal: () => void;
   closeRecommendationsModal: () => void;
-  fetchRecommendations: () => Promise<void>;
+  fetchRecommendations: (productsInView?: Product[]) => Promise<void>; // Allow passing current products
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -109,8 +120,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const [currentSection, setCurrentSection] = useState<AppSection | null>(null);
-  const [currentSectionConfig, setCurrentSectionConfig] = useState<SectionConfig | null>(null);
+  
+  // State for old static sections
+  const [currentSection, setCurrentSectionState] = useState<AppSection | null>(null);
+  const [currentSectionConfig, setCurrentSectionConfigState] = useState<SectionConfig | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
@@ -120,7 +133,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [isRecommendationsModalOpen, setIsRecommendationsModalOpen] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<ProductCategory | 'all'>('all');
+  
+  // This selectedCategory is for sub-categories WITHIN a section/dynamic category page
+  const [selectedCategory, setSelectedCategoryState] = useState<ProductCategory | 'all'>('all');
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [searchFilterType, setSearchFilterType] = useState<SearchFilterType>('all');
   const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system');
@@ -137,6 +153,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const setUserProfile = useCallback((profile: SupabaseUser | null | ((prevState: SupabaseUser | null) => SupabaseUser | null)) => {
     setUserProfileState(profile);
   }, []);
+
+  const setCurrentSection = useCallback((section: AppSection | null) => {
+    setCurrentSectionState(section);
+  }, []);
+  const setCurrentSectionConfig = useCallback((config: SectionConfig | null) => {
+    setCurrentSectionConfigState(config);
+  }, []);
+  const setSelectedCategory = useCallback((category: ProductCategory | 'all') => {
+    setSelectedCategoryState(category);
+  }, []);
+
 
   const setTheme = useCallback((newTheme: 'light' | 'dark' | 'system') => {
     setThemeState(newTheme);
@@ -191,42 +218,47 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     else if (pathname.startsWith('/cosmetics')) newActiveSection = 'cosmetics';
     else if (pathname.startsWith('/fastfood')) newActiveSection = 'fastfood';
     
-    const isSearchRelevantPage = pathname === '/sections' ||
+    const isSearchRelevantPage = pathname === '/sections' || 
                                  pathname.startsWith('/grocery') ||
                                  pathname.startsWith('/cosmetics') ||
-                                 pathname.startsWith('/fastfood');
+                                 pathname.startsWith('/fastfood') ||
+                                 pathname.startsWith('/category/'); // Include new dynamic category pages
 
     if (!isSearchRelevantPage && searchTerm) {
       setSearchTerm('');
       setSearchFilterType('all');
     }
 
-    if (newActiveSection) {
+    if (newActiveSection) { // Handling for old static sections
       if (newActiveSection !== currentSection) {
         setCurrentSection(newActiveSection);
         setCurrentSectionConfig(sectionsConfig[newActiveSection]);
+        // Reset cart, wishlist, viewedProducts when changing main static sections
         setCart([]);
         setWishlist([]);
         setViewedProducts([]);
         setRecommendations([]);
-        setSelectedCategory('all');
+        setSelectedCategory('all'); // Reset sub-category filter
       }
-    } else {
+    } else if (!pathname.startsWith('/category/')) { 
+      // If not in a static section AND not in a dynamic category page, clear section context.
+      // This allows /sections, /account, etc., to have a neutral context.
       if (currentSection !== null) { 
         setCurrentSection(null);
         setCurrentSectionConfig(null);
-        setCart([]);
-        setWishlist([]);
-        setViewedProducts([]);
-        setRecommendations([]);
-        setSelectedCategory('all');
-        if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin') || pathname.startsWith('/not-authorized')) {
+        // Potentially reset cart/wishlist here too if they are section-specific
+        // For now, let's assume cart/wishlist are global unless on a static section page
+         if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin') || pathname.startsWith('/not-authorized') || pathname === '/sections') {
            if (searchTerm) setSearchTerm('');
            if (searchFilterType !== 'all') setSearchFilterType('all');
+           if (selectedCategory !== 'all') setSelectedCategory('all'); // Reset sub-category on global pages
         }
       }
     }
-  }, [pathname, currentSection, searchTerm, searchFilterType]);
+    // If pathname.startsWith('/category/'), the specific page will handle its data.
+    // AppContext's currentSection/currentSectionConfig will be null, which is intended.
+
+  }, [pathname, currentSection, searchTerm, searchFilterType, selectedCategory, setCurrentSection, setCurrentSectionConfig, setSelectedCategory]);
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<SupabaseUser | null> => {
     const { data: profileData, error } = await supabase
@@ -239,11 +271,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (error.code !== 'PGRST116') { 
         toast({ 
           title: "Profile Error", 
-          description: `Could not load your profile details. ${error.message}`, 
+          description: \`Could not load your profile details. \${error.message}\`, 
           variant: "destructive" 
         });
       } else {
-        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
+        console.warn(\`User profile not found for auth_id \${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.\`);
         toast({
             title: "Profile Setup Pending",
             description: "Your profile is being finalized. If this message persists, please try signing in again shortly or contact support.",
@@ -271,11 +303,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           console.log('User signed in but email not yet confirmed.');
         } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
           console.log('User email confirmed or user updated post-confirmation.');
-          // Toast for email verification only if it just happened
           if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at && !session?.user?.user_metadata?.email_verified_toast_shown) {
               toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
-              // Optionally, update user metadata to prevent showing this toast again
-              // await supabase.auth.updateUser({ data: { email_verified_toast_shown: true } });
           }
         }
         await fetchUserProfile(currentAuthUser.id);
@@ -337,6 +366,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     toast({ title: "Signed In Successfully!"});
+    // fetchUserProfile will be called by onAuthStateChange
     setIsLoadingAuth(false); 
     return true; 
   };
@@ -358,7 +388,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     if (data.user) {
-        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.`);
+        console.log(\`Supabase auth.signUp successful. Auth User ID: \${data.user.id}, Email: \${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.\`);
     } else {
         console.warn("Supabase auth.signUp successful, but no user data returned in the response. This might indicate email confirmation is pending or an issue with Supabase project settings (e.g., auto-confirm off).");
     }
@@ -373,9 +403,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
-      setIsLoadingAuth(false); 
     } else {
       toast({ title: "Signed Out"});
+      setCart([]);
+      setWishlist([]);
+      setViewedProducts([]);
+      // UserProfile will be set to null by onAuthStateChange
     }
     setIsLoadingAuth(false); 
   };
@@ -393,7 +426,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
     toast({
       title: "Added to Cart",
-      description: `${product.name} is now in your cart.`,
+      description: \`\${product.name} is now in your cart.\`,
     });
   }, [toast]);
 
@@ -401,7 +434,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Cart",
-      description: `Item removed from your cart.`,
+      description: \`Item removed from your cart.\`,
     });
   }, [toast]);
 
@@ -426,13 +459,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (prevWishlist.find((item) => item.id === product.id)) {
         toast({
           title: "Removed from Wishlist",
-          description: `${product.name} is no longer in your wishlist.`,
+          description: \`\${product.name} is no longer in your wishlist.\`,
         });
         return prevWishlist.filter(item => item.id !== product.id);
       }
       toast({
         title: "Added to Wishlist",
-        description: `${product.name} has been added to your wishlist.`,
+        description: \`\${product.name} has been added to your wishlist.\`,
       });
       return [...prevWishlist, product];
     });
@@ -442,15 +475,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setWishlist((prevWishlist) => prevWishlist.filter((item) => item.id !== productId));
     toast({
       title: "Removed from Wishlist",
-      description: `Item removed from your wishlist.`,
+      description: \`Item removed from your wishlist.\`,
     });
   }, [toast]);
 
   const addToViewedProducts = useCallback((productId: string) => {
     setViewedProducts((prev) => {
-      if (prev.includes(productId)) return prev;
-      const newViewed = [...prev, productId];
-      return newViewed.slice(-10); 
+      if (prev.includes(productId)) return prev; // Avoid duplicates, keep most recent if re-viewed
+      const newViewed = [productId, ...prev.filter(id => id !== productId)]; // Add to front
+      return newViewed.slice(0, 10); // Keep last 10 viewed
     });
   }, []);
 
@@ -459,11 +492,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const openRecommendationsModal = useCallback(() => setIsRecommendationsModalOpen(true), []);
   const closeRecommendationsModal = useCallback(() => setIsRecommendationsModalOpen(false), []);
 
-  const fetchRecommendations = useCallback(async () => {
-    if (!currentSectionConfig || viewedProducts.length === 0) {
+  // Updated fetchRecommendations to optionally take current products in view
+  const fetchRecommendations = useCallback(async (productsInView?: Product[]) => {
+    if (viewedProducts.length === 0) {
       toast({
         title: "Need More Info",
-        description: "Explore some products in this section first to get personalized recommendations.",
+        description: "Explore some products first to get personalized recommendations.",
       });
       return;
     }
@@ -472,8 +506,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const result: PersonalizedRecommendationsOutput = await generatePersonalizedRecommendations({
         viewedProducts: viewedProducts,
       });
+      
+      // Determine the pool of products to select recommendations from
+      // If productsInView (e.g., from a dynamic category page) is provided, use that.
+      // Otherwise, fallback to currentSectionConfig?.products (for old static sections).
+      // If neither, fallback to an empty array.
+      const productPool = productsInView || currentSectionConfig?.products || [];
+
       const recommendedProducts = result.recommendations
-        .map(id => currentSectionConfig.products.find(p => p.id === id))
+        .map(id => productPool.find(p => p.id === id))
         .filter((p): p is Product => Boolean(p));
 
       setRecommendations(recommendedProducts);
@@ -510,9 +551,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         recommendations,
         isLoadingRecommendations,
         currentSection,
+        setCurrentSection,
         currentSectionConfig,
-        selectedCategory,
-        setSelectedCategory,
+        setCurrentSectionConfig,
+        selectedCategory, // sub-category filter
+        setSelectedCategory, // sub-category filter
         searchTerm,
         setSearchTerm,
         searchFilterType,
