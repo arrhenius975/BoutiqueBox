@@ -3,7 +3,8 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2 } from 'lucide-react';
+import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2, Info } from 'lucide-react'; // Added Info
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert components
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useEffect, useState } from "react";
@@ -220,9 +221,21 @@ export default function AdminDashboardPage() {
           </div>
         </>
       )}
-      <p className="text-sm text-muted-foreground text-center">
-        Note: Ensure Supabase views for `revenue_over_time`, `inventory_status`, `new_signups_over_time`, `active_users_count_last_30_days`, and `orders_count_last_30_days` are created and populated for accurate data.
-      </p>
+      <Alert className="mt-8">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Supabase Views Required for Analytics</AlertTitle>
+        <AlertDescription>
+          For the dashboard analytics to display data correctly, you need to create the following views in your Supabase SQL editor:
+          <ul className="list-disc list-inside mt-2 text-xs space-y-1">
+            <li>`revenue_over_time` (e.g., daily revenue from delivered orders in the last 30 days)</li>
+            <li>`inventory_status` (e.g., product counts per category, low stock items)</li>
+            <li>`new_signups_over_time` (e.g., daily new user signups from the `users` table in the last 30 days)</li>
+            <li>`active_users_count_last_30_days` (e.g., count of users created in the last 30 days)</li>
+            <li>`orders_count_last_30_days` (e.g., count of orders placed in the last 30 days)</li>
+          </ul>
+          Example SQL for these views can be found in the comments of `/api/admin/analytics/route.ts`.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SearchFilterType, SupabaseUser } from '@/types';
+import type { Product, CartItem, WishlistItem, ProductCategory, AppSection, SectionConfig, SearchFilterType, SupabaseUser, AnnouncementSetting } from '@/types';
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +83,9 @@ interface AppContextType {
   signOut: () => Promise<void>;
   setUserProfile: React.Dispatch<React.SetStateAction<SupabaseUser | null>>;
 
+  announcementBanner: AnnouncementSetting | null;
+  isLoadingAnnouncement: boolean;
+
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
@@ -125,6 +128,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [userProfile, setUserProfileState] = useState<SupabaseUser | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  const [announcementBanner, setAnnouncementBanner] = useState<AnnouncementSetting | null>(null);
+  const [isLoadingAnnouncement, setIsLoadingAnnouncement] = useState(true);
 
   const { toast } = useToast();
 
@@ -230,20 +236,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .single();
     if (error) {
       console.error('Error fetching user profile:', error);
-      // Only show destructive toast if it's not a "resource not found" type error, 
-      // which is expected if the trigger hasn't run yet for a new user.
-      if (error.code !== 'PGRST116') { // PGRST116: "Row to be returned was not found"
+      if (error.code !== 'PGRST116') { 
         toast({ 
           title: "Profile Error", 
           description: `Could not load your profile details. ${error.message}`, 
           variant: "destructive" 
         });
       } else {
-        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up.`);
+        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
         toast({
-            title: "Profile Not Yet Ready",
-            description: "Your profile is being set up. If this persists, please try signing in again shortly or contact support. Ensure a database trigger exists to sync auth.users with public.users.",
-            variant: "default"
+            title: "Profile Setup Pending",
+            description: "Your profile is being finalized. If this message persists, please try signing in again shortly or contact support.",
+            variant: "default",
+            duration: 7000,
         });
       }
       setUserProfile(null); 
@@ -266,7 +271,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           console.log('User signed in but email not yet confirmed.');
         } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
           console.log('User email confirmed or user updated post-confirmation.');
-          toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
+          // Toast for email verification only if it just happened
+          if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at && !session?.user?.user_metadata?.email_verified_toast_shown) {
+              toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
+              // Optionally, update user metadata to prevent showing this toast again
+              // await supabase.auth.updateUser({ data: { email_verified_toast_shown: true } });
+          }
         }
         await fetchUserProfile(currentAuthUser.id);
       } else {
@@ -295,6 +305,28 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [fetchUserProfile, toast, userProfile?.email]);
 
+  useEffect(() => {
+    const fetchAppAnnouncement = async () => {
+      setIsLoadingAnnouncement(true);
+      try {
+        const response = await fetch('/api/announcement');
+        if (response.ok) {
+          const data = await response.json();
+          setAnnouncementBanner(data.announcement_banner || { message: '', enabled: false });
+        } else {
+          console.warn('Failed to fetch announcement banner, using default.');
+          setAnnouncementBanner({ message: '', enabled: false });
+        }
+      } catch (error) {
+        console.error("Error fetching announcement banner:", error);
+        setAnnouncementBanner({ message: '', enabled: false });
+      } finally {
+        setIsLoadingAnnouncement(false);
+      }
+    };
+    fetchAppAnnouncement();
+  }, []);
+
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
     setIsLoadingAuth(true);
     const { error, data } = await supabase.auth.signInWithPassword({ email, password });
@@ -305,8 +337,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     toast({ title: "Signed In Successfully!"});
-    // fetchUserProfile will be called by onAuthStateChange
-    setIsLoadingAuth(false); // Ensure loading state is reset
+    setIsLoadingAuth(false); 
     return true; 
   };
 
@@ -327,13 +358,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     if (data.user) {
-        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger for public.users profile creation.`);
+        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.`);
     } else {
         console.warn("Supabase auth.signUp successful, but no user data returned in the response. This might indicate email confirmation is pending or an issue with Supabase project settings (e.g., auto-confirm off).");
     }
     
     toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
-    setIsLoadingAuth(false); // Reset loading state
+    setIsLoadingAuth(false); 
     return true; 
   };
   
@@ -345,10 +376,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingAuth(false); 
     } else {
       toast({ title: "Signed Out"});
-      // AppContext's onAuthStateChange will set authUser and userProfile to null
-      // router.push('/'); // No need to push here, onAuthStateChange handles user state update, page components will react.
     }
-    setIsLoadingAuth(false); // Ensure loading state is reset
+    setIsLoadingAuth(false); 
   };
 
 
@@ -497,6 +526,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmail,
         signOut,
         setUserProfile,
+        announcementBanner,
+        isLoadingAnnouncement,
         addToCart,
         removeFromCart,
         updateCartQuantity,
