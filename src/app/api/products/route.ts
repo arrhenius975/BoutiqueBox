@@ -42,14 +42,8 @@ export async function POST(req: NextRequest) {
     if (!name || !priceStr || !category_id_str || !stockStr) { 
         return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id' }, { status: 400 });
     }
-    if (imageFile && imageFile.size === 0) { // Check if an image file was provided but is empty
-        return NextResponse.json({ error: 'Image file cannot be empty if provided.' }, { status: 400 });
-    }
-    if (!imageFile && !formData.has('currentImageUrl')) { // Check if no new image and no existing one (for POST, imageFile is generally expected)
-      // For POST, we usually expect an image. If currentImageUrl logic were here, it'd be for PUT.
-      // So, if no imageFile, it's typically an error for a new product unless placeholders are auto-generated
-      // and image is truly optional, which is not the case here as per ProductForm logic.
-       return NextResponse.json({ error: 'Product image is required for new products.' }, { status: 400 });
+    if (!imageFile || imageFile.size === 0) {
+       return NextResponse.json({ error: 'Product image is required for new products and cannot be empty.' }, { status: 400 });
     }
 
     const price = parseFloat(priceStr);
@@ -57,12 +51,22 @@ export async function POST(req: NextRequest) {
     const category_id = parseInt(category_id_str, 10);
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '') ? parseInt(brand_id_str, 10) : null;
 
-    if (isNaN(price) || isNaN(stock) || isNaN(category_id)) {
-        return NextResponse.json({ error: 'Invalid numeric value for price, stock, or category_id' }, { status: 400 });
+    if (isNaN(price) || price <= 0) {
+        return NextResponse.json({ error: 'Invalid price value. Must be a number greater than 0.' }, { status: 400 });
+    }
+    if (isNaN(stock) || stock < 0) {
+        return NextResponse.json({ error: 'Invalid stock value. Must be a non-negative number.' }, { status: 400 });
+    }
+    if (isNaN(category_id)) {
+        return NextResponse.json({ error: 'Invalid category_id. Must be a number.' }, { status: 400 });
     }
     if (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '' && isNaN(brand_id as number)) {
         return NextResponse.json({ error: 'Invalid numeric value for brand_id' }, { status: 400 });
     }
+    if (imageFile.size > 2 * 1024 * 1024) { // 2MB limit
+        return NextResponse.json({ error: 'Image file too large (max 2MB).' }, { status: 413 });
+    }
+
 
     const productInsertPayload: {
         name: string;
@@ -73,13 +77,13 @@ export async function POST(req: NextRequest) {
         brand_id?: number | null;
         data_ai_hint?: string | null;
     } = {
-        name,
-        description: description || undefined,
+        name: name.trim(),
+        description: description?.trim() || undefined,
         price,
         stock,
         category_id,
         brand_id: brand_id,
-        data_ai_hint: dataAiHint || name.toLowerCase().split(" ")[0] || "product"
+        data_ai_hint: dataAiHint?.trim() || name.trim().toLowerCase().split(" ")[0] || "product"
     };
 
     const { data: productData, error: productInsertError } = await supabase
@@ -90,32 +94,40 @@ export async function POST(req: NextRequest) {
 
     if (productInsertError || !productData) {
       console.error('Product insert error:', productInsertError);
-      return NextResponse.json({ error: productInsertError?.message || 'Product insertion failed' }, { status: 500 });
+      if (productInsertError?.code === '23505') { // Unique constraint violation
+        return NextResponse.json({ error: `Product creation failed: A product with similar unique details (e.g., name if unique constraint exists) might already exist. ${productInsertError.details || productInsertError.message}` }, { status: 409 });
+      }
+      if (productInsertError?.code === '23503') { // Foreign key violation (e.g. category_id or brand_id does not exist)
+         return NextResponse.json({ error: `Product creation failed: Invalid category or brand specified. ${productInsertError.details || productInsertError.message}` }, { status: 400 });
+      }
+      return NextResponse.json({ error: productInsertError?.message || 'Product insertion failed. Please check data and try again.' }, { status: 500 });
     }
 
     let publicUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(name.substring(0,2))}`; 
 
     if (imageFile && imageFile.size > 0) {
         const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-        // Corrected filePath for Supabase Storage: bucket_name/product_id/file_name
-        const filePath = `${productData.id}/${Date.now()}-${sanitizedFileName}`; // Path relative to the bucket
+        const filePath = `${productData.id}/${Date.now()}-${sanitizedFileName}`; 
 
         const { error: uploadErr } = await supabase.storage
-            .from('product-images') // Bucket name
+            .from('product-images')
             .upload(filePath, imageFile, { upsert: true, contentType: imageFile.type });
 
         if (uploadErr) {
             console.error('Image upload error:', uploadErr);
-            return NextResponse.json({ error: `Product created, but image upload failed: ${uploadErr.message}. Product ID: ${productData.id}` }, { status: 500 });
+            // Attempt to delete the product record if image upload fails, as image is mandatory for new products
+            await supabase.from('products').delete().eq('id', productData.id);
+            return NextResponse.json({ error: `Image upload failed: ${uploadErr.message}. Product creation has been rolled back.` }, { status: 500 });
         }
 
         const { data: urlData } = supabase.storage
-            .from('product-images') // Bucket name
+            .from('product-images')
             .getPublicUrl(filePath);
 
         if (!urlData || !urlData.publicUrl) {
             console.error('Failed to get public URL for uploaded image:', filePath);
-            return NextResponse.json({ error: `Product created, image uploaded, but failed to retrieve public URL. Product ID: ${productData.id}` }, { status: 500 });
+            await supabase.from('products').delete().eq('id', productData.id); // Rollback
+            return NextResponse.json({ error: `Image uploaded, but failed to retrieve public URL. Product creation rolled back.` }, { status: 500 });
         }
         publicUrl = urlData.publicUrl;
 
@@ -127,22 +139,17 @@ export async function POST(req: NextRequest) {
 
         if (productImageInsertError) {
             console.error('Product image DB insert error:', productImageInsertError);
-            return NextResponse.json({ error: `Product created, image uploaded, but linking image to product failed: ${productImageInsertError.message}. Product ID: ${productData.id}` }, { status: 500 });
+            // Attempt to rollback product and storage image
+            await supabase.storage.from('product-images').remove([filePath]);
+            await supabase.from('products').delete().eq('id', productData.id);
+            return NextResponse.json({ error: `Image uploaded, but linking image to product failed: ${productImageInsertError.message}. Product creation rolled back.` }, { status: 500 });
         }
     } else {
-        // If no imageFile, link the default placeholder image
-         const { error: placeholderImageInsertError } = await supabase.from('product_images').insert({
-            product_id: productData.id,
-            image_url: publicUrl, // This is the placeholder URL
-            is_primary: true
-        });
-         if (placeholderImageInsertError) {
-            console.warn('Failed to insert placeholder image URL for product:', productData.id, placeholderImageInsertError);
-            // Not returning error here as product creation was successful, but image linking might need attention.
-        }
+        // This case should ideally not be hit if image is mandatory as per prior checks.
+        // If it were optional, this is where placeholder logic would go.
+        // For now, we assume imageFile is present and valid.
     }
     
-    // Refetch the product with its category name for the response
     const { data: finalProductData, error: finalFetchError } = await supabase
       .from('products')
       .select(\`
@@ -161,15 +168,19 @@ export async function POST(req: NextRequest) {
 
     if (finalFetchError || !finalProductData) {
         console.error('Failed to refetch product details after creation:', finalFetchError);
-        // Return the initially created productData if refetch fails, but log the issue.
-        return NextResponse.json({ success: true, product: { ...productData, image: publicUrl, category: { name: 'Category name fetch pending'} } });
+        // Product and image were created, but refetch failed. This is a partial success.
+        // It's better to return the initial productData and alert admin if necessary.
+        return NextResponse.json({ 
+            success: true, 
+            product: { ...productData, image: publicUrl, category: { name: 'Category name fetch pending'} },
+            warning: 'Product created, but full details could not be immediately refetched.'
+        }, { status: 201 });
     }
 
-
-    return NextResponse.json({ success: true, product: finalProductData });
+    return NextResponse.json({ success: true, product: finalProductData }, { status: 201 });
   } catch (e: unknown) {
     console.error('POST /api/products unexpected error:', e);
-    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred during product creation.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -177,6 +188,11 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+  // Optional: Add admin check if all products list should be admin-only
+  // if (!await isAdmin(supabase)) {
+  //   return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
+  // }
 
   try {
     const { data, error } = await supabase
@@ -197,14 +213,16 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.error('GET /api/products error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: `Failed to fetch products: ${error.message}` }, { status: 500 });
     }
 
     return NextResponse.json(data);
 
   } catch (e: unknown) {
     console.error('GET /api/products general error:', e);
-    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred';
+    const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching products.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+
+    
