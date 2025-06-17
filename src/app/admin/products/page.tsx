@@ -6,8 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2, Package } from 'lucide-react'; // Added Package for stock
-import type { Product, SupabaseCategory as AdminUICategoryType } from '@/types'; // Changed ProductCategory to SupabaseCategory
+import { PlusCircle, Edit3, Trash2, Search, Image as ImageIcon, Loader2, Package } from 'lucide-react';
+import type { Product, SupabaseCategory as AdminUICategoryType } from '@/types';
 import { ProductForm, type ProductFormSubmitData } from './components/ProductForm';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Image from 'next/image';
@@ -21,17 +21,15 @@ import {
 } from "@/components/ui/select"
 import { useToast } from '@/hooks/use-toast';
 
-// Hardcoded allPossibleCategories is removed. Categories will be fetched.
-
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [allCategories, setAllCategories] = useState<AdminUICategoryType[]>([]); // State for fetched categories
+  const [allCategories, setAllCategories] = useState<AdminUICategoryType[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategoryId, setFilterCategoryId] = useState<string>('all'); // Store category ID as string
+  const [filterCategoryId, setFilterCategoryId] = useState<string>('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -80,15 +78,19 @@ export default function AdminProductsPage() {
       const dataToFormat = Array.isArray(rawData) ? rawData : [];
 
       const formattedProducts: Product[] = dataToFormat.map((p: any) => {
+        const primaryImage = p.product_images?.find((img: any) => img.is_primary)?.image_url;
+        const categoryName = p.category_id?.name || 'Uncategorized'; // Ensure category_id and its name are accessed safely
+        const categoryId = p.category_id?.id;
+
         return {
           id: p.id,
           name: p.name,
           description: p.description,
           price: parseFloat(p.price),
-          stock: p.stock, // Add stock here
-          category: p.category_id?.name || 'Uncategorized', // Use category name from join
-          category_id: p.category_id?.id, // Store category_id
-          image: p.product_images?.find((img: any) => img.is_primary)?.image_url || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
+          stock: p.stock,
+          category: categoryName,
+          category_id: categoryId,
+          image: primaryImage || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
           'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
         };
       });
@@ -157,9 +159,8 @@ export default function AdminProductsPage() {
     formData.append('name', data.name);
     formData.append('description', data.description);
     formData.append('price', data.price);
-    formData.append('stock', data.stock); // Add stock to FormData
+    formData.append('stock', data.stock);
 
-    // data.category_id is now directly the ID from ProductFormSubmitData
     if (data.category_id) {
       formData.append('category_id', data.category_id.toString());
     } else {
@@ -168,7 +169,7 @@ export default function AdminProductsPage() {
       if(loadingToastId) toast.dismiss(loadingToastId);
       return;
     }
-    formData.append('brand_id', '1'); // Mocking brand_id, replace with actual brand selection if implemented
+    formData.append('brand_id', '1'); 
 
     if (data.imageFile) {
       formData.append('imageFile', data.imageFile, data.imageFile.name);
@@ -226,9 +227,8 @@ export default function AdminProductsPage() {
     return matchesSearch && matchesCategory;
   });
 
-  // Prepare categories for the ProductForm dropdown
   const formSelectableCategories = allCategories.map(cat => ({
-    value: cat.id, // Use number for value if ProductForm can handle it, otherwise toString()
+    value: cat.id,
     label: cat.name,
   }));
 
@@ -261,7 +261,7 @@ export default function AdminProductsPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
-                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0}
+                disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0}
               />
             </div>
             <Select
@@ -270,7 +270,7 @@ export default function AdminProductsPage() {
                 disabled={(isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Filter by category" />
+                <SelectValue placeholder={isLoadingCategories && allCategories.length === 0 ? "Loading categories..." : "Filter by category"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
@@ -313,13 +313,11 @@ export default function AdminProductsPage() {
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                     {product.category} {/* Display category name */}
+                     {product.category}
                   </TableCell>
                   <TableCell>${product.price.toFixed(2)}</TableCell>
                   <TableCell>
-                    {/* @ts-ignore */}
                     <span className={`font-medium ${product.stock <= 5 ? 'text-destructive' : (product.stock <= 20 ? 'text-yellow-600' : 'text-green-600')}`}>
-                        {/* @ts-ignore */}
                         {product.stock !== undefined ? product.stock : 'N/A'}
                     </span>
                   </TableCell>
@@ -338,7 +336,7 @@ export default function AdminProductsPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center h-24">
-                    {products.length === 0 ? "No products yet. Click 'Add New Product' to get started!" : "No products found matching your search or filter."}
+                    {products.length === 0 && !searchTerm && filterCategoryId === 'all' ? "No products yet. Click 'Add New Product' to get started!" : "No products found matching your search or filter."}
                   </TableCell>
                 </TableRow>
               )}
@@ -354,7 +352,7 @@ export default function AdminProductsPage() {
         if (!isOpen) setEditingProduct(null);
       }}>
         <DialogContent className="sm:max-w-2xl p-0">
-          {isFormOpen && ( // Conditionally render to reset form state on open/close
+          {isFormOpen && (
             <ProductForm
               product={editingProduct}
               onSubmit={handleFormSubmit}
@@ -371,3 +369,5 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
+    
