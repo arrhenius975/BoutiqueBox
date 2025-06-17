@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 // Example SQL for these views/functions can be found in comments below or on the Admin Dashboard page.
 
 export async function GET(req: NextRequest) {
-  const cookieStore = await cookies();
+  const cookieStore = cookies(); // Corrected: removed await
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   console.log('API /api/admin/analytics: Received GET request.');
