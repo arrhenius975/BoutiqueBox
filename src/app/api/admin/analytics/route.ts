@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 // Example SQL for these views/functions can be found in comments below or on the Admin Dashboard page.
 
 export async function GET(req: NextRequest) {
-  const cookieStore = cookies(); // Corrected: removed await
+  const cookieStore = await cookies(); // Corrected: await is REQUIRED here
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   console.log('API /api/admin/analytics: Received GET request.');
@@ -146,3 +146,5 @@ export async function GET(req: NextRequest) {
 // SELECT COUNT(id) as count
 // FROM orders
 // WHERE created_at >= NOW() - INTERVAL '30 days';
+
+    
