@@ -94,10 +94,10 @@ export async function POST(req: NextRequest) {
 
     if (productInsertError || !productData) {
       console.error('Product insert error:', productInsertError);
-      if (productInsertError?.code === '23505') { // Unique constraint violation
+      if (productInsertError?.code === '23505') { 
         return NextResponse.json({ error: `Product creation failed: A product with similar unique details (e.g., name if unique constraint exists) might already exist. ${productInsertError.details || productInsertError.message}` }, { status: 409 });
       }
-      if (productInsertError?.code === '23503') { // Foreign key violation (e.g. category_id or brand_id does not exist)
+      if (productInsertError?.code === '23503') { 
          return NextResponse.json({ error: `Product creation failed: Invalid category or brand specified. ${productInsertError.details || productInsertError.message}` }, { status: 400 });
       }
       return NextResponse.json({ error: productInsertError?.message || 'Product insertion failed. Please check data and try again.' }, { status: 500 });
@@ -115,7 +115,6 @@ export async function POST(req: NextRequest) {
 
         if (uploadErr) {
             console.error('Image upload error:', uploadErr);
-            // Attempt to delete the product record if image upload fails, as image is mandatory for new products
             await supabase.from('products').delete().eq('id', productData.id);
             return NextResponse.json({ error: `Image upload failed: ${uploadErr.message}. Product creation has been rolled back.` }, { status: 500 });
         }
@@ -126,7 +125,8 @@ export async function POST(req: NextRequest) {
 
         if (!urlData || !urlData.publicUrl) {
             console.error('Failed to get public URL for uploaded image:', filePath);
-            await supabase.from('products').delete().eq('id', productData.id); // Rollback
+            await supabase.storage.from('product-images').remove([filePath]);
+            await supabase.from('products').delete().eq('id', productData.id); 
             return NextResponse.json({ error: `Image uploaded, but failed to retrieve public URL. Product creation rolled back.` }, { status: 500 });
         }
         publicUrl = urlData.publicUrl;
@@ -139,20 +139,15 @@ export async function POST(req: NextRequest) {
 
         if (productImageInsertError) {
             console.error('Product image DB insert error:', productImageInsertError);
-            // Attempt to rollback product and storage image
             await supabase.storage.from('product-images').remove([filePath]);
             await supabase.from('products').delete().eq('id', productData.id);
             return NextResponse.json({ error: `Image uploaded, but linking image to product failed: ${productImageInsertError.message}. Product creation rolled back.` }, { status: 500 });
         }
-    } else {
-        // This case should ideally not be hit if image is mandatory as per prior checks.
-        // If it were optional, this is where placeholder logic would go.
-        // For now, we assume imageFile is present and valid.
     }
     
     const { data: finalProductData, error: finalFetchError } = await supabase
       .from('products')
-      .select(\`
+      .select(`
         id,
         name,
         description,
@@ -162,17 +157,15 @@ export async function POST(req: NextRequest) {
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
-      \`)
+      `)
       .eq('id', productData.id)
       .single();
 
     if (finalFetchError || !finalProductData) {
         console.error('Failed to refetch product details after creation:', finalFetchError);
-        // Product and image were created, but refetch failed. This is a partial success.
-        // It's better to return the initial productData and alert admin if necessary.
         return NextResponse.json({ 
             success: true, 
-            product: { ...productData, image: publicUrl, category: { name: 'Category name fetch pending'} },
+            product: { ...productData, image: publicUrl, category: { name: 'Category name fetch pending'} }, // Return what we have
             warning: 'Product created, but full details could not be immediately refetched.'
         }, { status: 201 });
     }
@@ -189,15 +182,10 @@ export async function GET(req: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-  // Optional: Add admin check if all products list should be admin-only
-  // if (!await isAdmin(supabase)) {
-  //   return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
-  // }
-
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(\`
+      .select(`
         id,
         name,
         description,
@@ -207,7 +195,7 @@ export async function GET(req: NextRequest) {
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
         data_ai_hint
-      \`)
+      `)
       .order('created_at', { ascending: false });
 
 
@@ -218,11 +206,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(data);
 
-  } catch (e: unknown) {
+  } catch (e: unknown)
+{
     console.error('GET /api/products general error:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching products.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
     
