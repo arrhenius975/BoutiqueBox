@@ -1,3 +1,4 @@
+
 // src/app/categories/components/StickyHeader.tsx
 "use client";
 
@@ -59,7 +60,7 @@ export function StickyHeader({ searchTerm, setSearchTerm, onSearchSubmit }: Stic
         <div className="flex h-20 items-center justify-between">
           <Link href="/" className="flex items-center">
             <span className="text-3xl font-bold text-gradient bg-gradient-to-r from-stone-800 via-amber-700 to-rose-700 dark:from-stone-200 dark:via-amber-300 dark:to-rose-300">
-              BoutiqueBox
+              Barak Online Store
             </span>
           </Link>
           
@@ -87,7 +88,7 @@ export function StickyHeader({ searchTerm, setSearchTerm, onSearchSubmit }: Stic
           </div>
 
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/account" className="text-sm font-medium text-stone-700 hover:text-amber-600 dark:text-stone-300 dark:hover:text-amber-400">
+            <Link href="/profile" className="text-sm font-medium text-stone-700 hover:text-amber-600 dark:text-stone-300 dark:hover:text-amber-400">
               Account
             </Link>
             <Link href="/help" className="text-sm font-medium text-stone-700 hover:text-amber-600 dark:text-stone-300 dark:hover:text-amber-400">

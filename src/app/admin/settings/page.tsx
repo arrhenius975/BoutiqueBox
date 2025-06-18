@@ -93,7 +93,7 @@ export default function AdminSettingsPage() {
     <div className="space-y-8">
       <header>
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Application Settings</h1>
-        <p className="text-muted-foreground">Manage global settings for BoutiqueBox.</p>
+        <p className="text-muted-foreground">Manage global settings for Barak Online Store.</p>
       </header>
 
       <Alert>

@@ -67,7 +67,7 @@ export function AdminSidebar() {
           )}
           {isLoadingAuth ? 'Logging out...' : 'Log Out'}
         </Button>
-         <p className="text-xs text-slate-500 text-center mt-4">&copy; BoutiqueBox Admin</p>
+         <p className="text-xs text-slate-500 text-center mt-4">&copy; Barak Online Store Admin</p>
       </div>
     </aside>
   );

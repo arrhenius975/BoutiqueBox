@@ -1,3 +1,4 @@
+
 // src/app/categories/page.tsx
 "use client";
 
@@ -84,10 +85,10 @@ export default function CategoriesPage() {
     setFilteredCategories(filtered);
   }, [searchTerm, allCategories]);
 
-  const FloatingOrb = ({ className, size = "w-32 h-32", delay = "0s" }: { className: string; size?: string; delay?: string }) => (
+  const FloatingOrb = ({ className, size = "w-32 h-32", delay = "0s", style }: { className: string; size?: string; delay?: string; style?: React.CSSProperties }) => (
     <div
       className={`absolute rounded-full opacity-10 blur-2xl animate-float ${size} ${className}`}
-      style={{ animationDelay: delay }}
+      style={{ animationDelay: delay, ...style }}
     />
   );
 
@@ -104,11 +105,11 @@ export default function CategoriesPage() {
 
       <main className="flex-grow pt-28 md:pt-32 pb-16 container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <section className="text-center mb-12 md:mb-20">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 text-gradient bg-gradient-to-r from-stone-800 via-amber-700 to-rose-700 dark:from-stone-100 dark:via-amber-300 dark:to-rose-300 animate-fade-in-up">
-            Explore Our Collections
+          <h1 className="text-5xl md:text-7xl font-bold mb-4 text-gradient bg-gradient-to-r from-stone-800 via-amber-700 to-rose-700 dark:from-stone-100 dark:via-amber-300 dark:to-rose-300 animate-fade-in-up">
+            Barak Online Store
           </h1>
-          <p className="text-lg md:text-xl text-stone-600 dark:text-stone-400 max-w-3xl mx-auto animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-            Discover a curated selection of premium products across various categories, tailored to elevate your lifestyle.
+          <p className="text-lg md:text-xl text-stone-600 dark:text-stone-400 max-w-3xl mx-auto animate-fade-in-up" style={{animationDelay: '0.3s'}}>
+            Explore our collections.
           </p>
         </section>
 
@@ -154,27 +155,3 @@ export default function CategoriesPage() {
     </div>
   );
 }
-
-// Add bg-grid pattern to tailwind.config.js if needed, or use an inline SVG background
-// For now, using a simple div for grid lines.
-// Or, if this pattern is in globals.css, it's fine.
-// Let's assume `bg-grid-stone-200/30` would be a custom utility. 
-// For simplicity, I'll create it here inline if needed, or rely on a general approach for demo.
-// The brief's globals.css doesn't define it, so this will be a simple div.
-// Better to have a dedicated bg-grid utility.
-// For now, removing `bg-grid-stone-200/30` and relying on gradient background and orbs.
-// Added `bg-grid-stone-200/30 dark:bg-grid-stone-800/20` as it's a common pattern.
-// Needs to be defined in `tailwind.config.ts` plugins or `globals.css` utilities
-// Example for `tailwind.config.js` plugins:
-// plugin(function({ matchUtilities, theme }) {
-//   matchUtilities(
-//     { 'bg-grid': (value) => ({ backgroundImage: `url("${svgToTinyDataUri(
-//       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="${value}"><path d="M0 .5H31.5V32"/></svg>`
-//     )}")` }) },
-//     { values: flattenColorPalette(theme('backgroundColor')), type: 'color' }
-//   )
-// })
-// This is complex. I'll use a pseudo-element for a simpler grid for now in the CSS.
-// A simple placeholder div is used above for the grid.
-// Removed the `bg-grid` class for now and will rely on other visual elements.
-// Added it back as it was in a previous successful generation. The user must have it.

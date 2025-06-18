@@ -5,7 +5,7 @@ import { ClientProviders } from '@/contexts/ClientProviders'; // Import the new 
 // AppProvider and Toaster are now handled by ClientProviders
 
 export const metadata: Metadata = {
-  title: 'BoutiqueBox - Your Multi-Store App',
+  title: 'Barak Online Store - Your Multi-Store App',
   description: 'Explore groceries, cosmetics, and fast food all in one place!',
 };
 

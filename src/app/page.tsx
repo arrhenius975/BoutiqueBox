@@ -16,7 +16,7 @@ const BoutiqueBoxLanding = () => {
   const slides = [
     {
       id: 'welcome',
-      title: 'Welcome to BoutiqueBox!',
+      title: 'Welcome to Barak Online Store!',
       content: 'welcome'
     },
     {
@@ -109,7 +109,7 @@ const BoutiqueBoxLanding = () => {
       <div className="relative z-10 text-center text-white px-8 max-w-4xl mx-auto">
         <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <h1 className="text-6xl md:text-8xl font-serif mb-8 tracking-wider">
-            BOUTIQUE<span className="text-emerald-300">BOX</span>
+            BARAK ONLINE <span className="text-emerald-300">STORE</span>
           </h1>
           <div className="w-24 h-0.5 bg-emerald-300 mx-auto mb-8"></div>
           <p className="text-xl md:text-2xl font-light leading-relaxed mb-12 text-gray-200">
@@ -185,7 +185,7 @@ const BoutiqueBoxLanding = () => {
           <div className="text-center space-y-8">
             <h3 className="text-3xl font-serif text-gray-800">Our Promise to You</h3>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              At BoutiqueBox, we believe that everyone deserves access to premium products and exceptional service. 
+              At Barak Online Store, we believe that everyone deserves access to premium products and exceptional service. 
               Our commitment goes beyond just delivery – we're here to enhance your lifestyle and give you back 
               the time that matters most.
             </p>
@@ -289,7 +289,7 @@ const BoutiqueBoxLanding = () => {
             <div className="text-center space-y-12">
               <h3 className="text-4xl font-serif text-white">Ready to Get Started?</h3>
               <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Join thousands of satisfied customers who have transformed their lifestyle with BoutiqueBox.
+                Join thousands of satisfied customers who have transformed their lifestyle with Barak Online Store.
               </p>
               
                 <div className="mt-16">

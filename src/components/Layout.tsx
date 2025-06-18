@@ -9,6 +9,7 @@ import { PersonalizedRecommendationsModal } from '@/components/PersonalizedRecom
 import { BottomNavBar } from '@/components/BottomNavBar'; 
 import { useAppContext } from '@/contexts/AppContext'; // Import useAppContext
 import { cn } from '@/lib/utils'; // Import cn for conditional class names
+import { usePathname } from 'next/navigation'; // Import usePathname
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,10 @@ interface LayoutProps {
 
 export function LayoutComponent({ children }: LayoutProps) { 
   const { announcementBanner, isLoadingAnnouncement } = useAppContext();
+  const pathname = usePathname();
+
+  // Do not render the global Header on the new /categories page, as it has its own StickyHeader
+  const showGlobalHeader = pathname !== '/categories';
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -33,7 +38,7 @@ export function LayoutComponent({ children }: LayoutProps) {
           {announcementBanner.message}
         </div>
       )}
-      <Header />
+      {showGlobalHeader && <Header />}
       <main className="flex-1">
         {children}
       </main>

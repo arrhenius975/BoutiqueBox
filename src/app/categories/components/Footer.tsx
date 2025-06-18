@@ -1,3 +1,4 @@
+
 // src/app/categories/components/Footer.tsx
 "use client";
 
@@ -47,7 +48,7 @@ export function Footer() {
         {/* Four-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 md:gap-12 mb-12">
           <div>
-            <h5 className="font-bold text-lg mb-4 text-stone-800 dark:text-stone-100">BoutiqueBox</h5>
+            <h5 className="font-bold text-lg mb-4 text-stone-800 dark:text-stone-100">Barak Online Store</h5>
             <p className="text-sm leading-relaxed">
               Curated luxury and convenience, delivered to your doorstep. Experience premium products and personalized service.
             </p>
@@ -65,7 +66,7 @@ export function Footer() {
             <h5 className="font-bold text-lg mb-4 text-stone-800 dark:text-stone-100">Support</h5>
             <ul className="space-y-2 text-sm">
               <li><Link href="/help" className="hover:text-amber-600 dark:hover:text-amber-400">Help Center</Link></li>
-              <li><Link href="/account/orders" className="hover:text-amber-600 dark:hover:text-amber-400">Track Order</Link></li>
+              <li><Link href="/orders" className="hover:text-amber-600 dark:hover:text-amber-400">Track Order</Link></li>
               <li><Link href="#" className="hover:text-amber-600 dark:hover:text-amber-400">Returns & Exchanges</Link></li>
               <li><Link href="#" className="hover:text-amber-600 dark:hover:text-amber-400">Contact Us</Link></li>
             </ul>
@@ -84,7 +85,7 @@ export function Footer() {
         {/* Social Media & Copyright */}
         <div className="border-t border-stone-300/70 dark:border-stone-700/70 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-stone-600 dark:text-stone-400 mb-4 md:mb-0">
-            &copy; {new Date().getFullYear()} BoutiqueBox. All rights reserved.
+            &copy; {new Date().getFullYear()} Barak Online Store. All rights reserved.
           </p>
           <div className="flex space-x-3">
             {socialLinks.map((social, index) => (

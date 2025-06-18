@@ -59,19 +59,19 @@ export function Header() {
   const wishlistItemCount = wishlist.length;
 
   const categoriesList: SectionCategory[] = currentSectionConfig?.categories || [];
-  const sectionName = currentSectionConfig?.name || 'BoutiqueBox';
+  const sectionName = currentSectionConfig?.name || 'Barak Online Store'; // Updated default name
   const sectionPath = currentSectionConfig?.path || '/categories';
 
 
   const isAppFeaturePage = pathname.startsWith('/grocery') ||
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood') ||
-                           pathname.startsWith('/category/') ||
+                           pathname.startsWith('/category/') || // This includes product details under /category/[id]/[pid]
                            pathname === '/categories';
 
   const isProductDetailPage =
-    pathname.split('/').length >= 3 &&
-    (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || (pathname.startsWith('/category/') && !pathname.endsWith('/categories') && pathname.split('/').length > 2 ) );
+    pathname.split('/').length > 2 && // e.g., /grocery/product-id or /category/cat-id/prod-id
+    (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || pathname.startsWith('/category/'));
 
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export function Header() {
           >
             <ShoppingBag className="h-7 w-7" />
             <span className="font-headline text-xl md:text-2xl font-bold">
-              {isUserPanelActive ? "My Panel" : (pathname.startsWith('/categories') ? 'BoutiqueBox' : sectionName)}
+              {isUserPanelActive ? "My Panel" : (pathname.startsWith('/categories') ? 'Barak Online Store' : sectionName)}
             </span>
           </Link>
           {currentSectionConfig && !isProductDetailPage && !isUserPanelActive && !pathname.startsWith('/categories') && (
