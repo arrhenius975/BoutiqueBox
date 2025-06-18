@@ -4,21 +4,27 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
+  console.log(`MIDDLEWARE: Running for path: ${req.nextUrl.pathname}`);
   const res = NextResponse.next();
-
-  // Create a Supabase client configured to use cookies
   const supabase = createMiddlewareClient({ req, res });
 
-  // Refresh session if expired - important to keep session alive for server-side rendering
-  // and API routes.
-  await supabase.auth.getSession();
-
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error("MIDDLEWARE: Error getting session:", error.message);
+    } else if (session) {
+      console.log("MIDDLEWARE: Session found, user:", session.user.email);
+    } else {
+      console.log("MIDDLEWARE: No active session found by middleware.");
+    }
+  } catch (e) {
+    console.error("MIDDLEWARE: Exception during getSession():", (e as Error).message);
+  }
+  
   return res;
 }
 
 // Ensure the middleware is only called for relevant paths.
-// Adjust this to match the paths where your Supabase auth is needed.
-// For example, if you want it to run on all paths except static assets:
 export const config = {
   matcher: [
     /*

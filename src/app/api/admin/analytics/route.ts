@@ -1,39 +1,78 @@
-
 // src/app/api/admin/analytics/route.ts
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { format } from 'date-fns';
 
-// IMPORTANT: You need to create these PostgreSQL functions/views in your Supabase project.
-// The "No data available" messages on your admin dashboard are because these views are missing.
-// Create them using the Supabase SQL Editor.
-// Using "SECURITY DEFINER" is recommended if your API connection role (e.g., 'anon' or 'authenticated')
-// doesn't have direct SELECT permissions on the underlying tables (orders, users) but the view
-// creator (e.g., 'postgres') does. This allows the view to perform aggregations securely.
-// Ensure the views only expose aggregated, non-sensitive data.
+interface RevenueDataPoint {
+  day: string;
+  revenue: number;
+}
+interface SignupDataPoint {
+  day: string;
+  signup_count: number;
+}
+interface InventoryStatus {
+  category_name: string;
+  product_count: number;
+  low_stock_count: number;
+}
+
+interface ChartRevenueData {
+  name: string;
+  revenue: number;
+}
+interface ChartSignupData {
+  name: string;
+  signups: number;
+}
+
+interface DashboardStats {
+  totalRevenue: number;
+  totalOrders: number;
+  activeUsers: number;
+  conversionRate: number;
+}
+
+interface AnalyticsApiResponse {
+  revenue: RevenueDataPoint[] | ChartRevenueData[]; // Allow both for processing
+  inventory: InventoryStatus[];
+  signups: SignupDataPoint[] | ChartSignupData[]; // Allow both for processing
+  stats: DashboardStats;
+}
 
 export async function GET(req: NextRequest) {
-  const cookieStore = await cookies(); 
+  console.log(`API /api/admin/analytics: Received GET request for path ${req.nextUrl.pathname}`);
+  const cookieStore = await cookies();
+
+  if (cookieStore.getAll().length > 0) {
+    console.log('API /api/admin/analytics: Cookie store is NOT empty. Cookies are being received by the route handler.');
+    // You can log specific cookie names if needed for debugging, e.g.,
+    // cookieStore.getAll().forEach(cookie => console.log(`Cookie: ${cookie.name}`));
+  } else {
+    console.warn('API /api/admin/analytics: Cookie store IS EMPTY. This is the primary reason for auth issues if it happens consistently.');
+  }
+
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-  console.log('API /api/admin/analytics: Received GET request.');
+  console.log('API /api/admin/analytics: Attempting to get user session via supabase.auth.getUser().');
   try {
-    console.log('API /api/admin/analytics: Attempting to get user session.');
     const { data: { user: authApiUser }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
-      console.error('API /api/admin/analytics: Auth error when calling supabase.auth.getUser():', authError.message);
+      // This is where "Auth session missing!" would be caught if authError is populated.
+      console.error('API /api/admin/analytics: Auth error from supabase.auth.getUser():', authError.message);
       return NextResponse.json({ error: `Auth service error: ${authError.message}` }, { status: 500 });
     }
 
     if (!authApiUser) {
-      console.warn('API /api/admin/analytics: No authenticated user found in API route. Session cookies might be missing or invalid.');
-      return NextResponse.json({ error: 'User not authenticated. No session found in API route.' }, { status: 401 });
+      console.warn('API /api/admin/analytics: No authenticated user found (authApiUser is null/undefined after getUser). This implies no valid session based on cookies.');
+      return NextResponse.json({ error: 'User not authenticated. No session found by Supabase client in API route.' }, { status: 401 });
     }
-    console.log(`API /api/admin/analytics: Authenticated user found: ${authApiUser.email} (Auth ID: ${authApiUser.id})`);
+    console.log(`API /api/admin/analytics: Authenticated user identified: ${authApiUser.email} (Auth ID: ${authApiUser.id})`);
 
-    console.log(`API /api/admin/analytics: Fetching profile for auth_id ${authApiUser.id}`);
+    console.log(`API /api/admin/analytics: Fetching profile for auth_id ${authApiUser.id} to check admin role.`);
     const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('role')
@@ -45,50 +84,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `Could not fetch user profile: ${profileError.message}` }, { status: 500 });
     }
     if (!profile) {
-        console.warn(`API /api/admin/analytics: Profile not found for auth_id ${authApiUser.id}`);
+        console.warn(`API /api/admin/analytics: Profile not found for auth_id ${authApiUser.id}. Cannot verify admin role.`);
         return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
     }
-    console.log(`API /api/admin/analytics: Profile found for auth_id ${authApiUser.id}. Role: ${profile.role}`);
+    console.log(`API /api/admin/analytics: Profile role for ${authApiUser.email}: ${profile.role}`);
 
     if (profile.role !== 'admin') {
-      console.warn(`API /api/admin/analytics: User ${authApiUser.email} (Auth ID: ${authApiUser.id}) is not an admin. Role: ${profile.role}`);
+      console.warn(`API /api/admin/analytics: User ${authApiUser.email} (Auth ID: ${authApiUser.id}) is NOT an admin. Role: ${profile.role}. Access denied.`);
       return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
     }
-    console.log(`API /api/admin/analytics: User ${authApiUser.email} is admin. Proceeding to fetch analytics.`);
+    console.log(`API /api/admin/analytics: User ${authApiUser.email} confirmed as admin. Proceeding to fetch analytics data.`);
 
+    // Helper to fetch data with fallback and logging
     const fetchDataWithFallback = async (queryPromise: Promise<{ data: any; error: any; count?: number | null }>, fallbackValue: any = [], metricName: string = "Unknown Metric") => {
       try {
         const { data, error, count } = await queryPromise;
         if (error) {
-          console.warn(`Analytics API: Error fetching ${metricName} - ${error.message}. View might be missing or misconfigured. Returning default.`);
-          // Log the specific error for server-side diagnosis
+          console.warn(`API /api/admin/analytics: Error fetching ${metricName} - ${error.message}. View might be missing or misconfigured. Returning default.`);
           return { data: fallbackValue, error: null, count: typeof fallbackValue === 'number' ? fallbackValue : (fallbackValue?.count !== undefined ? fallbackValue.count : null) };
         }
+        console.log(`API /api/admin/analytics: Successfully fetched ${metricName}. Count: ${count}, Data items: ${Array.isArray(data) ? data.length : (data ? 1 : 0)}`);
         return { data, error, count };
       } catch (e: any) {
-        console.error(`Analytics API: General error during ${metricName} fetch - ${e.message}. Returning default.`);
+        console.error(`API /api/admin/analytics: General error during ${metricName} fetch - ${e.message}. Returning default.`);
         return { data: fallbackValue, error: e, count: typeof fallbackValue === 'number' ? fallbackValue : (fallbackValue?.count !== undefined ? fallbackValue.count : null) };
       }
     };
 
     const revenueResult = await fetchDataWithFallback(supabase.from('revenue_over_time').select('*'), [], 'Revenue Over Time');
-    const inventoryResult = await fetchDataWithFallback(supabase.from('inventory_status').select('*'), [], 'Inventory Status');
+    const inventoryResult = await fetchDataWithFallback(supabase.from('inventory_status').select('*'), [], 'Inventory Status'); // Not used in current dashboard, but good to have
     const signupsResult = await fetchDataWithFallback(supabase.from('new_signups_over_time').select('*'), [], 'New Signups Over Time');
     
     const totalOrdersResult = await fetchDataWithFallback(
       supabase.from('orders').select('id', { count: 'exact', head: true }), 
-      { count: 0 }, // Fallback for count
-      'Total Orders'
+      { count: 0 }, 
+      'Total Orders Count'
     );
     const activeUsersCountResult = await fetchDataWithFallback(
       supabase.from('active_users_count_last_30_days').select('count').single(),
-      { data: { count: 0 } }, // Fallback for single object with count
-      'Active Users Count'
+      { data: { count: 0 } }, 
+      'Active Users Count (Last 30 Days)'
     );
     const ordersLast30DaysCountResult = await fetchDataWithFallback(
       supabase.from('orders_count_last_30_days').select('count').single(),
-      { data: { count: 0 } }, // Fallback for single object with count
-      'Orders Last 30 Days Count'
+      { data: { count: 0 } },
+      'Orders Count (Last 30 Days)'
     );
 
     const revenueData = revenueResult.data || [];
@@ -104,26 +144,38 @@ export async function GET(req: NextRequest) {
       conversionRate = (ordersLast30DaysCount / activeUsersCount) * 100;
     }
     
-    console.log('API /api/admin/analytics: Successfully fetched and processed analytics data (with fallbacks if needed).');
+    // Process data for charts (format date, etc.)
+    const processedRevenueData = (revenueData as RevenueDataPoint[]).map(item => ({
+        name: format(new Date(item.day), 'MMM dd'),
+        revenue: item.revenue,
+    })).slice(-30);
+
+    const processedSignupData = (signupsData as SignupDataPoint[]).map(item => ({
+        name: format(new Date(item.day), 'MMM dd'),
+        signups: item.signup_count,
+    })).slice(-30);
+
+
+    console.log('API /api/admin/analytics: Successfully fetched and processed all analytics data (with fallbacks if needed).');
     return NextResponse.json({
-      revenue: revenueData,
+      revenue: processedRevenueData, // Send processed data
       inventory: inventoryData,
-      signups: signupsData,
+      signups: processedSignupData, // Send processed data
       stats: {
-        totalRevenue: revenueData.reduce((sum: number, item: any) => sum + (item.revenue || 0), 0) || 0,
+        totalRevenue: processedRevenueData.reduce((sum: number, item: any) => sum + (item.revenue || 0), 0) || 0,
         totalOrders: totalOrders,
         activeUsers: activeUsersCount,
         conversionRate: parseFloat(conversionRate.toFixed(1)), 
       }
-    });
+    } as AnalyticsApiResponse);
 
   } catch (e: unknown) {
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching admin analytics.';
-    console.error('API /api/admin/analytics: General error in GET handler:', errorMessage);
+    console.error('API /api/admin/analytics: General error in GET handler:', errorMessage, e);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-    
+
 // -- Example SQL for Supabase Views (Create these in your Supabase SQL Editor) --
 // -- Remember to replace 'public.users' with your actual profiles table name if different.
 // -- Using 'SECURITY DEFINER' is often necessary for these views to access underlying tables.
@@ -153,6 +205,7 @@ export async function GET(req: NextRequest) {
 // GROUP BY c.name;
 
 // -- new_signups_over_time: Daily new user signups from the 'users' table (profiles table) for last 30 days.
+// -- Assumes your public profiles table is named 'users' and has a 'created_at' column.
 // CREATE OR REPLACE VIEW public.new_signups_over_time
 // WITH (security_definer = true)
 // AS
@@ -165,6 +218,7 @@ export async function GET(req: NextRequest) {
 // ORDER BY 1;
 
 // -- active_users_count_last_30_days: Count of users (profiles) created in the last 30 days.
+// -- Assumes your public profiles table is named 'users' and has a 'created_at' column.
 // CREATE OR REPLACE VIEW public.active_users_count_last_30_days
 // WITH (security_definer = true)
 // AS
@@ -173,11 +227,10 @@ export async function GET(req: NextRequest) {
 // WHERE u.created_at >= (NOW() - INTERVAL '30 days');
 
 // -- orders_count_last_30_days: Count of orders placed in the last 30 days.
+// -- Assumes your orders table is named 'orders' and has a 'created_at' column.
 // CREATE OR REPLACE VIEW public.orders_count_last_30_days
 // WITH (security_definer = true)
 // AS
 // SELECT COUNT(o.id) as count
 // FROM public.orders o
 // WHERE o.created_at >= (NOW() - INTERVAL '30 days');
-
-    
