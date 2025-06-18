@@ -23,7 +23,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Corrected: await cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   if (!await isAdmin(supabase)) {
@@ -47,8 +47,8 @@ export async function DELETE(
         if (fetchExistingError && fetchExistingError.code === 'PGRST116') { // Not found
              return NextResponse.json({ error: 'Product not found.' }, { status: 404 });
         }
-        console.error(`Error checking if product ${productId} exists:`, fetchExistingError?.message);
-        return NextResponse.json({ error: `Failed to verify product existence: ${fetchExistingError?.message}` }, { status: 500 });
+        console.error(\`Error checking if product \${productId} exists:\`, fetchExistingError?.message);
+        return NextResponse.json({ error: \`Failed to verify product existence: \${fetchExistingError?.message}\` }, { status: 500 });
     }
 
 
@@ -58,7 +58,7 @@ export async function DELETE(
       .eq('product_id', productId);
 
     if (imagesError) {
-      console.warn(`Error fetching image URLs for product ${productId}:`, imagesError.message);
+      console.warn(\`Error fetching image URLs for product \${productId}:\`, imagesError.message);
       // Proceed with product deletion even if image fetching fails, but log it.
     }
 
@@ -73,11 +73,11 @@ export async function DELETE(
       .eq('id', productId);
 
     if (productDeleteError) {
-      console.error(`Error deleting product ${productId} from database:`, productDeleteError.message);
+      console.error(\`Error deleting product \${productId} from database:\`, productDeleteError.message);
       if (productDeleteError.code === '23503') { // Foreign key violation
         return NextResponse.json({ error: 'Cannot delete product: It is currently referenced by other records (e.g., in orders or wishlists). Please remove those references first.' }, { status: 409 });
       }
-      return NextResponse.json({ error: `Failed to delete product: ${productDeleteError.message}` }, { status: 500 });
+      return NextResponse.json({ error: \`Failed to delete product: \${productDeleteError.message}\` }, { status: 500 });
     }
 
     // If product deletion was successful, attempt to clean up images
@@ -92,10 +92,10 @@ export async function DELETE(
             if (bucketNameIndex !== -1 && bucketNameIndex < pathSegments.length -1 ) {
               imagePathsToDelete.push(pathSegments.slice(bucketNameIndex + 1).join('/'));
             } else {
-               console.warn(`Could not parse path from image URL for deletion: ${img.image_url}`);
+               console.warn(\`Could not parse path from image URL for deletion: \${img.image_url}\`);
             }
           } catch (e) {
-            console.warn(`Invalid image URL found during delete operation for product ${productId}: ${img.image_url}`, e);
+            console.warn(\`Invalid image URL found during delete operation for product \${productId}: \${img.image_url}\`, e);
           }
         }
       }
@@ -106,11 +106,11 @@ export async function DELETE(
           .remove(imagePathsToDelete);
 
         if (storageDeleteError) {
-          console.warn(`Error deleting images from storage for product ${productId}:`, storageDeleteError.message);
+          console.warn(\`Error deleting images from storage for product \${productId}:\`, storageDeleteError.message);
           // Product was deleted from DB, but images might remain in storage.
           return NextResponse.json({
             success: true, // Product itself is deleted.
-            message: `Product deleted from database, but failed to cleanup some images from storage: ${storageDeleteError.message}. Please check storage and RLS policies.`
+            message: \`Product deleted from database, but failed to cleanup some images from storage: \${storageDeleteError.message}. Please check storage and RLS policies.\`
           });
         }
       }
@@ -122,7 +122,7 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: 'Product and associated images/records deleted successfully.' });
 
   } catch (e: unknown) {
-    console.error(`DELETE /api/products/[id] general error:`, e);
+    console.error(\`DELETE /api/products/[id] general error:\`, e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred during product deletion.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
@@ -132,7 +132,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Corrected: await cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   if (!await isAdmin(supabase)) {
@@ -150,7 +150,7 @@ export async function PUT(
     const priceStr = formData.get('price') as string;
     const category_id_str = formData.get('category_id') as string;
     const brand_id_str = formData.get('brand_id') as string | null;
-    const dataAiHint = formData.get('data_ai_hint') as string | null;
+    // const dataAiHint = formData.get('data_ai_hint') as string | null; // Value received but not used for DB ops
     const imageFile = formData.get('imageFile') as File | null;
     const stockStr = formData.get('stock') as string | null; 
 
@@ -187,7 +187,7 @@ export async function PUT(
       stock?: number;
       category_id: number;
       brand_id?: number | null;
-      data_ai_hint?: string | null;
+      // data_ai_hint?: string | null; // Temporarily removed
       updated_at: string;
     } = {
       name: name.trim(),
@@ -196,7 +196,7 @@ export async function PUT(
       stock, 
       category_id,
       brand_id: brand_id,
-      data_ai_hint: dataAiHint?.trim() || name.trim().toLowerCase().split(" ")[0] || "product",
+      // data_ai_hint: dataAiHint?.trim() || name.trim().toLowerCase().split(" ")[0] || "product", // Temporarily removed
       updated_at: new Date().toISOString(),
     };
 
@@ -210,10 +210,10 @@ export async function PUT(
     if (productUpdateError || !updatedProductData) {
       console.error('Product update error:', productUpdateError?.message);
       if (productUpdateError?.code === '23505') {
-        return NextResponse.json({ error: `Product update failed: A product with similar unique details might already exist. ${productUpdateError.details || productUpdateError.message}` }, { status: 409 });
+        return NextResponse.json({ error: \`Product update failed: A product with similar unique details might already exist. \${productUpdateError.details || productUpdateError.message}\` }, { status: 409 });
       }
       if (productUpdateError?.code === '23503') {
-         return NextResponse.json({ error: `Product update failed: Invalid category or brand specified. ${productUpdateError.details || productUpdateError.message}` }, { status: 400 });
+         return NextResponse.json({ error: \`Product update failed: Invalid category or brand specified. \${productUpdateError.details || productUpdateError.message}\` }, { status: 400 });
       }
        if (productUpdateError?.code === 'PGRST116') { // Not found
         return NextResponse.json({ error: 'Product not found for update.' }, { status: 404 });
@@ -229,7 +229,7 @@ export async function PUT(
         .eq('product_id', productId);
 
       if (oldImagesError) {
-        console.warn(`Could not fetch old image URLs for product ${productId} during update. Error: ${oldImagesError.message}`);
+        console.warn(\`Could not fetch old image URLs for product \${productId} during update. Error: \${oldImagesError.message}\`);
       } else if (oldImages && oldImages.length > 0) {
         const oldImageStoragePaths = oldImages.map(img => {
           if (img.image_url && !img.image_url.startsWith('https://placehold.co')) {
@@ -240,23 +240,23 @@ export async function PUT(
               if (bucketNameIndex !== -1 && bucketNameIndex < pathSegments.length -1 ) {
                  return pathSegments.slice(bucketNameIndex + 1).join('/');
               }
-            } catch (e) { console.warn(`Invalid old image URL format: ${img.image_url}`); }
+            } catch (e) { console.warn(\`Invalid old image URL format: \${img.image_url}\`); }
           }
           return null;
         }).filter(path => path !== null) as string[];
 
         if (oldImageStoragePaths.length > 0) {
           const { error: removeStorageError } = await supabase.storage.from('product-images').remove(oldImageStoragePaths);
-          if (removeStorageError) console.warn(`Failed to remove old images from storage for ${productId}: ${removeStorageError.message}`);
+          if (removeStorageError) console.warn(\`Failed to remove old images from storage for \${productId}: \${removeStorageError.message}\`);
         }
 
         // Delete old entries from product_images table
         const { error: deleteDbImagesError } = await supabase.from('product_images').delete().eq('product_id', productId);
-        if (deleteDbImagesError) console.warn(`Failed to delete old image records from DB for ${productId}: ${deleteDbImagesError.message}`);
+        if (deleteDbImagesError) console.warn(\`Failed to delete old image records from DB for \${productId}: \${deleteDbImagesError.message}\`);
       }
 
       const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
-      const newFilePath = `${productId}/${Date.now()}-${sanitizedFileName}`; 
+      const newFilePath = \`\${productId}/\${Date.now()}-\${sanitizedFileName}\`; 
       
       const { error: uploadErr } = await supabase.storage
         .from('product-images')
@@ -267,7 +267,7 @@ export async function PUT(
         return NextResponse.json({ 
             success: true, // Product details were updated
             product: updatedProductData, // Return the updated product data without new image
-            warning: `Product details updated, but new image upload failed: ${uploadErr.message}. Please try updating the image again.` 
+            warning: \`Product details updated, but new image upload failed: \${uploadErr.message}. Please try updating the image again.\` 
         }, { status: 200 }); // 200 because product update was partially successful
       }
 
@@ -277,7 +277,7 @@ export async function PUT(
          return NextResponse.json({ 
             success: true, 
             product: updatedProductData,
-            warning: `Product updated, image uploaded, but failed to get public URL. Image might not display correctly.` 
+            warning: \`Product updated, image uploaded, but failed to get public URL. Image might not display correctly.\` 
         }, { status: 200 });
       }
       
@@ -292,7 +292,7 @@ export async function PUT(
         return NextResponse.json({ 
             success: true,
             product: updatedProductData,
-            warning: `Product updated, image uploaded, but linking new image in DB failed: ${newProductImageInsertError.message}.`
+            warning: \`Product updated, image uploaded, but linking new image in DB failed: \${newProductImageInsertError.message}.\`
         }, { status: 200 });
       }
     }
@@ -308,8 +308,7 @@ export async function PUT(
         stock,
         category_id ( id, name ),
         brand_id ( id, name ),
-        product_images ( image_url, is_primary ),
-        data_ai_hint
+        product_images ( image_url, is_primary )
       \`)
       .eq('id', productId)
       .single();
@@ -326,10 +325,10 @@ export async function PUT(
     return NextResponse.json({ success: true, product: finalProductData });
 
   } catch (e: unknown) {
-    console.error(`PUT /api/products/[id] general error:`, e);
+    console.error(\`PUT /api/products/[id] general error:\`, e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred during product update.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
+    
     

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const priceStr = formData.get('price') as string;
     const category_id_str = formData.get('category_id') as string;
     const brand_id_str = formData.get('brand_id') as string | null; // Can be null or not present
-    const dataAiHint = formData.get('data_ai_hint') as string | null;
+    // const dataAiHint = formData.get('data_ai_hint') as string | null; // Value received but not used for DB ops
     const imageFile = formData.get('imageFile') as File | null;
     const stockStr = formData.get('stock') as string | null;
 
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       stock,
       category_id,
       brand_id: brand_id, // Will be null if brand_id_str was null/empty
-      data_ai_hint: dataAiHint?.trim() || name.trim().toLowerCase().split(" ")[0] || "product",
+      // data_ai_hint: dataAiHint?.trim() || name.trim().toLowerCase().split(" ")[0] || "product", // Temporarily removed
     };
 
     const { data: productData, error: productInsertError } = await supabase
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
     // 5. Refetch the complete product data with joins for the response
     const { data: finalProductData, error: finalFetchError } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -161,9 +161,8 @@ export async function POST(req: NextRequest) {
         stock,
         category_id ( id, name ),
         brand_id ( id, name ),
-        product_images ( image_url, is_primary ),
-        data_ai_hint
-      `)
+        product_images ( image_url, is_primary )
+      \`)
       .eq('id', productData.id)
       .single();
 
@@ -189,20 +188,13 @@ export async function POST(req: NextRequest) {
 
 // GET handler for fetching all products (for admin panel or potentially public listing)
 export async function GET(req: NextRequest) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // Corrected: await cookies()
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-  // Public GET for all products should not require admin typically,
-  // but if used only by admin panel, this check can be added.
-  // For now, assume public access for listing products.
-  // if (!await isAdmin(supabase)) {
-  //   return NextResponse.json({ error: 'Forbidden: Admin access required for this view of products.' }, { status: 403 });
-  // }
   
   try {
     const { data, error } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -211,10 +203,9 @@ export async function GET(req: NextRequest) {
         category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary ),
-        data_ai_hint,
         created_at,
         updated_at
-      `)
+      \`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -222,7 +213,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch products: ' + error.message }, { status: 500 });
     }
 
-    // No transformation needed here if the query directly gives the desired structure
     return NextResponse.json(data);
 
   } catch (e: unknown) {
@@ -231,3 +221,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+    
