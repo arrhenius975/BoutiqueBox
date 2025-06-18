@@ -6,7 +6,12 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // IMPORTANT: You need to create these PostgreSQL functions/views in your Supabase project.
-// Example SQL for these views/functions can be found in comments below or on the Admin Dashboard page.
+// The "No data available" messages on your admin dashboard are because these views are missing.
+// Create them using the Supabase SQL Editor.
+// Using "SECURITY DEFINER" is recommended if your API connection role (e.g., 'anon' or 'authenticated')
+// doesn't have direct SELECT permissions on the underlying tables (orders, users) but the view
+// creator (e.g., 'postgres') does. This allows the view to perform aggregations securely.
+// Ensure the views only expose aggregated, non-sensitive data.
 
 export async function GET(req: NextRequest) {
   const cookieStore = await cookies(); 
@@ -119,48 +124,60 @@ export async function GET(req: NextRequest) {
   }
 }
     
-// -- Example SQL for Supabase Views (create these in your Supabase SQL editor) --
+// -- Example SQL for Supabase Views (Create these in your Supabase SQL Editor) --
+// -- Remember to replace 'public.users' with your actual profiles table name if different.
+// -- Using 'SECURITY DEFINER' is often necessary for these views to access underlying tables.
 
-// -- revenue_over_time (Example: daily revenue for last 30 days from 'delivered' orders)
-// CREATE OR REPLACE VIEW revenue_over_time AS
+// -- revenue_over_time: Daily revenue from 'delivered' or 'paid' orders in the last 30 days.
+// CREATE OR REPLACE VIEW public.revenue_over_time
+// WITH (security_definer = true)
+// AS
 // SELECT
-//   date_trunc('day', created_at)::date AS day,
-//   SUM(total_amount) AS revenue
-// FROM orders
-// WHERE status = 'delivered' AND created_at >= NOW() - INTERVAL '30 days'
+//   date_trunc('day', o.created_at)::date AS day,
+//   SUM(o.total_amount) AS revenue
+// FROM public.orders o
+// WHERE o.status IN ('delivered', 'paid') AND o.created_at >= (NOW() - INTERVAL '30 days')
 // GROUP BY 1
 // ORDER BY 1;
 
-// -- inventory_status (Example: count of products by category, and low stock items)
-// CREATE OR REPLACE VIEW inventory_status AS
+// -- inventory_status: Product counts per category and low stock items.
+// CREATE OR REPLACE VIEW public.inventory_status
+// WITH (security_definer = true)
+// AS
 // SELECT
 //   c.name AS category_name,
 //   COUNT(p.id) AS product_count,
 //   SUM(CASE WHEN p.stock < 10 THEN 1 ELSE 0 END) as low_stock_count
-// FROM products p
-// JOIN categories c ON p.category_id = c.id
+// FROM public.products p
+// JOIN public.categories c ON p.category_id = c.id
 // GROUP BY c.name;
 
-// -- new_signups_over_time (Example: daily new user signups for last 30 days)
-// CREATE OR REPLACE VIEW new_signups_over_time AS
+// -- new_signups_over_time: Daily new user signups from the 'users' table (profiles table) for last 30 days.
+// CREATE OR REPLACE VIEW public.new_signups_over_time
+// WITH (security_definer = true)
+// AS
 // SELECT
-//   date_trunc('day', created_at)::date AS day,
-//   COUNT(id) AS signup_count
-// FROM users -- Assuming 'users' is your profiles table linked to auth.users
-// WHERE created_at >= NOW() - INTERVAL '30 days'
+//   date_trunc('day', u.created_at)::date AS day,
+//   COUNT(u.id) AS signup_count
+// FROM public.users u -- Ensure 'users' is your profiles table linked to auth.users
+// WHERE u.created_at >= (NOW() - INTERVAL '30 days')
 // GROUP BY 1
 // ORDER BY 1;
 
-// -- active_users_count_last_30_days (Example: count of users created in the last 30 days)
-// CREATE OR REPLACE VIEW active_users_count_last_30_days AS
-// SELECT COUNT(id) as count
-// FROM users -- Assuming 'users' is your profiles table
-// WHERE created_at >= NOW() - INTERVAL '30 days';
+// -- active_users_count_last_30_days: Count of users (profiles) created in the last 30 days.
+// CREATE OR REPLACE VIEW public.active_users_count_last_30_days
+// WITH (security_definer = true)
+// AS
+// SELECT COUNT(u.id) as count
+// FROM public.users u -- Ensure 'users' is your profiles table
+// WHERE u.created_at >= (NOW() - INTERVAL '30 days');
 
-// -- orders_count_last_30_days (Example: count of orders placed in the last 30 days)
-// CREATE OR REPLACE VIEW orders_count_last_30_days AS
-// SELECT COUNT(id) as count
-// FROM orders
-// WHERE created_at >= NOW() - INTERVAL '30 days';
+// -- orders_count_last_30_days: Count of orders placed in the last 30 days.
+// CREATE OR REPLACE VIEW public.orders_count_last_30_days
+// WITH (security_definer = true)
+// AS
+// SELECT COUNT(o.id) as count
+// FROM public.orders o
+// WHERE o.created_at >= (NOW() - INTERVAL '30 days');
 
     
