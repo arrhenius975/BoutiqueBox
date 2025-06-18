@@ -16,7 +16,8 @@ export function UserSidebar() {
 
   const navItems = [
     { href: '/profile', label: 'My Profile', icon: User },
-    { href: '/orders', label: 'Order History', icon: ShoppingBasket },
+    // Conditionally add Order History if not admin
+    ...(userProfile?.role !== 'admin' ? [{ href: '/orders', label: 'Order History', icon: ShoppingBasket }] : []),
     { href: '/user-settings', label: 'Settings', icon: Settings },
   ];
 

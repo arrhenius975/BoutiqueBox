@@ -134,9 +134,6 @@ export default function ProfilePage() {
     initials: userProfile.name ? userProfile.name.substring(0,2).toUpperCase() : (userProfile.email?.substring(0,2).toUpperCase() || 'U'),
   };
 
-  // Account options are now mostly in the sidebar. This section could display key info or other non-nav options.
-  // For now, focusing on profile edit form.
-
   return (
     <div className="space-y-8">
       <header className="mb-8">
@@ -212,9 +209,11 @@ export default function ProfilePage() {
             <CardTitle>Quick Access</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Button variant="outline" asChild className="justify-start">
-                <Link href="/orders"><ShoppingBasket className="mr-2 h-4 w-4"/> View Order History</Link>
-            </Button>
+            {userProfile.role !== 'admin' && (
+              <Button variant="outline" asChild className="justify-start">
+                  <Link href="/orders"><ShoppingBasket className="mr-2 h-4 w-4"/> View Order History</Link>
+              </Button>
+            )}
              <Button variant="outline" onClick={toggleWishlist} className="justify-start">
                 <Heart className="mr-2 h-4 w-4"/> Manage Wishlist
             </Button>
