@@ -135,8 +135,12 @@ export default function AdminCategoriesPage() {
           <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Category Management</h1>
           <p className="text-muted-foreground">Add, edit, or remove product categories.</p>
         </div>
-        <Button onClick={handleAddCategory} size="lg" disabled={isSubmitting || isLoading}>
-          {isLoading && !categories.length && !isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
+        <Button 
+          onClick={handleAddCategory} 
+          size="lg" 
+          disabled={isSubmitting || (isLoading && categories.length === 0)}
+        >
+          {(isLoading && categories.length === 0 && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />} 
           Add New Category
         </Button>
       </header>
@@ -220,3 +224,4 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
+

@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 // Example SQL for these views/functions can be found in comments below or on the Admin Dashboard page.
 
 export async function GET(req: NextRequest) {
-  const cookieStore = await cookies(); // Corrected: await is REQUIRED here
+  const cookieStore = await cookies(); 
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   console.log('API /api/admin/analytics: Received GET request.');
@@ -51,45 +51,61 @@ export async function GET(req: NextRequest) {
     }
     console.log(`API /api/admin/analytics: User ${authApiUser.email} is admin. Proceeding to fetch analytics.`);
 
+    const fetchDataWithFallback = async (queryPromise: Promise<{ data: any; error: any; count?: number | null }>, fallbackValue: any = [], metricName: string = "Unknown Metric") => {
+      try {
+        const { data, error, count } = await queryPromise;
+        if (error) {
+          console.warn(`Analytics API: Error fetching ${metricName} - ${error.message}. View might be missing or misconfigured. Returning default.`);
+          // Log the specific error for server-side diagnosis
+          return { data: fallbackValue, error: null, count: typeof fallbackValue === 'number' ? fallbackValue : (fallbackValue?.count !== undefined ? fallbackValue.count : null) };
+        }
+        return { data, error, count };
+      } catch (e: any) {
+        console.error(`Analytics API: General error during ${metricName} fetch - ${e.message}. Returning default.`);
+        return { data: fallbackValue, error: e, count: typeof fallbackValue === 'number' ? fallbackValue : (fallbackValue?.count !== undefined ? fallbackValue.count : null) };
+      }
+    };
 
-    const [
-        revenueData, 
-        inventoryData, 
-        signupsData,
-        totalOrdersData,
-        activeUsersCountData,
-        ordersLast30DaysCountData
-    ] = await Promise.all([
-      supabase.from('revenue_over_time').select('*'),
-      supabase.from('inventory_status').select('*'),
-      supabase.from('new_signups_over_time').select('*'),
-      supabase.from('orders').select('id', { count: 'exact', head: true }), // Total orders
-      supabase.from('active_users_count_last_30_days').select('count').single(), // Assumes view exists
-      supabase.from('orders_count_last_30_days').select('count').single() // Assumes view exists
-    ]);
+    const revenueResult = await fetchDataWithFallback(supabase.from('revenue_over_time').select('*'), [], 'Revenue Over Time');
+    const inventoryResult = await fetchDataWithFallback(supabase.from('inventory_status').select('*'), [], 'Inventory Status');
+    const signupsResult = await fetchDataWithFallback(supabase.from('new_signups_over_time').select('*'), [], 'New Signups Over Time');
+    
+    const totalOrdersResult = await fetchDataWithFallback(
+      supabase.from('orders').select('id', { count: 'exact', head: true }), 
+      { count: 0 }, // Fallback for count
+      'Total Orders'
+    );
+    const activeUsersCountResult = await fetchDataWithFallback(
+      supabase.from('active_users_count_last_30_days').select('count').single(),
+      { data: { count: 0 } }, // Fallback for single object with count
+      'Active Users Count'
+    );
+    const ordersLast30DaysCountResult = await fetchDataWithFallback(
+      supabase.from('orders_count_last_30_days').select('count').single(),
+      { data: { count: 0 } }, // Fallback for single object with count
+      'Orders Last 30 Days Count'
+    );
 
-    if (revenueData.error) throw new Error(`Analytics error - Revenue data: ${revenueData.error.message}`);
-    if (inventoryData.error) throw new Error(`Analytics error - Inventory data: ${inventoryData.error.message}`);
-    if (signupsData.error) throw new Error(`Analytics error - Signups data: ${signupsData.error.message}`);
-    if (totalOrdersData.error) throw new Error(`Analytics error - Total orders data: ${totalOrdersData.error.message}`);
-    if (activeUsersCountData.error) throw new Error(`Analytics error - Active users count: ${activeUsersCountData.error.message}. Ensure 'active_users_count_last_30_days' view exists.`);
-    if (ordersLast30DaysCountData.error) throw new Error(`Analytics error - Orders last 30 days count: ${ordersLast30DaysCountData.error.message}. Ensure 'orders_count_last_30_days' view exists.`);
-
-    const totalOrders = totalOrdersData.count || 0;
-    const activeUsersCount = activeUsersCountData.data?.count || 0;
-    const ordersLast30DaysCount = ordersLast30DaysCountData.data?.count || 0;
+    const revenueData = revenueResult.data || [];
+    const inventoryData = inventoryResult.data || [];
+    const signupsData = signupsResult.data || [];
+    
+    const totalOrders = totalOrdersResult.count || 0;
+    const activeUsersCount = activeUsersCountResult.data?.count || 0;
+    const ordersLast30DaysCount = ordersLast30DaysCountResult.data?.count || 0;
 
     let conversionRate = 0;
     if (activeUsersCount > 0) {
       conversionRate = (ordersLast30DaysCount / activeUsersCount) * 100;
     }
-    console.log('API /api/admin/analytics: Successfully fetched and processed analytics data.');
+    
+    console.log('API /api/admin/analytics: Successfully fetched and processed analytics data (with fallbacks if needed).');
     return NextResponse.json({
-      revenue: revenueData.data,
-      inventory: inventoryData.data,
-      signups: signupsData.data,
+      revenue: revenueData,
+      inventory: inventoryData,
+      signups: signupsData,
       stats: {
-        totalRevenue: revenueData.data?.reduce((sum, item) => sum + (item.revenue || 0), 0) || 0,
+        totalRevenue: revenueData.reduce((sum: number, item: any) => sum + (item.revenue || 0), 0) || 0,
         totalOrders: totalOrders,
         activeUsers: activeUsersCount,
         conversionRate: parseFloat(conversionRate.toFixed(1)), 

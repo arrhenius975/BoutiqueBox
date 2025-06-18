@@ -70,29 +70,32 @@ export default function AdminDashboardPage() {
         const response = await fetch('/api/admin/analytics');
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics data.' }));
-          throw new Error(errorData.error);
+          throw new Error(errorData.error || `Server responded with status ${response.status}`);
         }
         const data: AnalyticsApiResponse = await response.json();
         
-        const processedRevenueData = data.revenue.map(item => ({
+        const processedRevenueData = (data.revenue || []).map(item => ({
           name: format(new Date(item.day), 'MMM dd'),
           revenue: item.revenue,
-        })).slice(-30);
+        })).slice(-30); // Ensure data.revenue is treated as array
         setRevenueChartData(processedRevenueData);
 
-        const processedSignupData = data.signups.map(item => ({
+        const processedSignupData = (data.signups || []).map(item => ({
           name: format(new Date(item.day), 'MMM dd'),
           signups: item.signup_count,
-        })).slice(-30);
+        })).slice(-30); // Ensure data.signups is treated as array
         setSignupChartData(processedSignupData);
 
-        // setInventorySummary(data.inventory); // Store for future use
-        setStats(data.stats);
+        // setInventorySummary(data.inventory || []); // Ensure data.inventory is treated as array
+        setStats(data.stats || { totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
 
-        // toast({ title: "Analytics Loaded", description: "Dashboard data has been updated." }); // Can be a bit noisy
       } catch (error) {
         console.error("Error fetching admin analytics:", error);
         toast({ title: "Analytics Error", description: (error as Error).message, variant: "destructive" });
+        // Set to default empty/zero states on error
+        setRevenueChartData([]);
+        setSignupChartData([]);
+        setStats({ totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
       } finally {
         setIsLoading(false);
       }
@@ -130,7 +133,7 @@ export default function AdminDashboardPage() {
                 <DollarSign className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${stats.totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-2xl font-bold">${(stats.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                 <p className="text-xs text-muted-foreground">(Based on fetched daily data for last 30 days)</p>
               </CardContent>
             </Card>
@@ -140,7 +143,7 @@ export default function AdminDashboardPage() {
                 <ShoppingCart className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalOrders.toLocaleString()}</div>
+                <div className="text-2xl font-bold">{(stats.totalOrders || 0).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">(All-time)</p>
               </CardContent>
             </Card>
@@ -150,7 +153,7 @@ export default function AdminDashboardPage() {
                 <Users className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
+                <div className="text-2xl font-bold">{(stats.activeUsers || 0).toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">(Signed up in last 30 days)</p>
               </CardContent>
             </Card>
@@ -160,7 +163,7 @@ export default function AdminDashboardPage() {
                 <Activity className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.conversionRate.toFixed(1)}%</div>
+                <div className="text-2xl font-bold">{(stats.conversionRate || 0).toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground">(Orders / Active Users, last 30 days)</p>
               </CardContent>
             </Card>
@@ -190,7 +193,7 @@ export default function AdminDashboardPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 ) : (
-                  <p className="text-center text-muted-foreground py-10">No revenue data available for the selected period.</p>
+                  <p className="text-center text-muted-foreground py-10">No revenue data available for the selected period. Ensure 'revenue_over_time' view is set up.</p>
                 )}
               </CardContent>
             </Card>
@@ -214,7 +217,7 @@ export default function AdminDashboardPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 ) : (
-                   <p className="text-center text-muted-foreground py-10">No signup data available for the selected period.</p>
+                   <p className="text-center text-muted-foreground py-10">No signup data available for the selected period. Ensure 'new_signups_over_time' view is set up.</p>
                 )}
               </CardContent>
             </Card>
