@@ -14,20 +14,26 @@ export function BottomNavBar() {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
-  const sectionHomePath = currentSectionConfig?.path || '/categories'; // Default to new /categories page
+  // Determine the "Home" link for the bottom nav.
+  // If in a specific section (grocery, etc.), Home points to that section's root.
+  // Otherwise (e.g., on /categories, /profile), Home points to /categories.
+  let homePath = '/categories'; // Default home is the main categories/store page
+  if (currentSectionConfig && (pathname.startsWith(currentSectionConfig.path) || pathname === currentSectionConfig.path)) {
+    homePath = currentSectionConfig.path;
+  }
 
   const navItems = [
-    { href: sectionHomePath, label: 'Home', icon: Home },
-    { href: '/categories', label: 'Stores', icon: LayoutGrid }, // "Stores" now points to /categories
-    { href: '/account', label: 'Account', icon: User },
+    { href: homePath, label: 'Home', icon: Home },
+    { href: '/categories', label: 'Stores', icon: LayoutGrid },
+    { href: '/profile', label: 'Account', icon: User }, // Updated to /profile
     { href: '/help', label: 'Help', icon: HelpCircle },
-    { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/user-settings', label: 'Settings', icon: Settings }, // Updated to /user-settings
   ];
 
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      const headerHeight = 80; 
+      const headerHeight = 80;
 
       if (currentScrollY <= 10) {
         setIsVisible(true);
@@ -45,41 +51,33 @@ export function BottomNavBar() {
     };
   }, []);
 
-  // Hide BottomNavBar on the main landing page
-  if (pathname === '/') {
+  if (pathname === '/') { // Hide on main landing page
     return null;
   }
-  // Hide BottomNavBar on the new categories page if it has its own fixed/sticky header/footer
-  if (pathname === '/categories') {
-    // return null; // Keeping it for now as the new categories page might not have full nav
-  }
 
-
-  // Logic to determine if Home icon should be active
-  const isHomePageActive = (itemHref: string, itemLabel: string) => {
+  // Determine if the current path matches the "Home" item's href specifically
+  const isHomeActive = (itemHref: string, itemLabel: string) => {
     if (itemLabel === 'Home') {
-      // If current path matches the specific section's home path (e.g., /grocery)
-      if (currentSectionConfig && pathname === currentSectionConfig.path) return true;
-      // If no specific section, and current path is /categories (which is now the main store hub)
-      if (!currentSectionConfig && pathname === '/categories') return true;
-      // If on a sub-page of a current section (e.g. /grocery/product-id)
-      if (currentSectionConfig && pathname.startsWith(currentSectionConfig.path + '/')) return true;
+      // If current path is exactly the calculated homePath
+      if (pathname === homePath) return true;
+      // Or, if in a section context, and current path starts with that section's home path (e.g. product detail page)
+      if (currentSectionConfig && pathname.startsWith(currentSectionConfig.path)) return true;
     }
-    return pathname === itemHref;
+    // For other items, direct path match or startsWith if not a base path like '/categories'
+    return pathname === itemHref || (pathname.startsWith(itemHref) && itemHref !== '/categories' && itemHref !== '/profile' && itemHref !== '/user-settings');
   };
-
 
   return (
     <nav
       className={cn(
-        "fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden",
+        "fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 md:hidden", // md:hidden because UserPanelLayout handles desktop sidebar
         "transition-all duration-300 ease-in-out",
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
       )}
     >
       <div className="flex items-center justify-around gap-2 bg-background/90 backdrop-blur-lg rounded-full px-4 py-2 shadow-xl border border-border/30">
         {navItems.map((item) => {
-          const isActive = isHomePageActive(item.href, item.label);
+          const isActive = isHomeActive(item.href, item.label);
           const Icon = item.icon;
 
           return (

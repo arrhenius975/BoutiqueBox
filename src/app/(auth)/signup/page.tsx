@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Loader2, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
+import { UserPlus, Loader2, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppContext } from '@/contexts/AppContext';
@@ -32,27 +32,22 @@ export default function SignUpPage() {
     const success = await signUpWithEmail(name, email, password);
     setIsSubmitting(false);
     if (success) {
-      // User will get a toast "Sign Up Successful! Please check your email to verify your account."
-      // After email verification, they can sign in.
-      // Redirecting to sign-in page is appropriate.
       router.push('/signin');
     }
   };
 
   useEffect(() => {
     if (!isLoadingAuth && authUser) {
-      if (userProfile) { // Profile loaded, can redirect
+      if (userProfile) {
         if (userProfile.role === 'admin') {
           router.push('/admin/dashboard');
         } else {
-          router.push('/account');
+          router.push('/profile'); // Updated redirect to /profile
         }
       }
-      // If authUser exists but userProfile is not yet loaded, wait for profile. Loader below handles this.
     }
   }, [authUser, userProfile, isLoadingAuth, router]);
 
-  // Show main loader if auth state is initially loading and no user is yet detected
   if (isLoadingAuth && !authUser && !userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -61,8 +56,6 @@ export default function SignUpPage() {
     );
   }
 
-  // If already logged in (authUser exists and auth not loading)
-  // and trying to access sign-up, show loader while redirecting.
   if (authUser && !isLoadingAuth) {
      return (
       <div className="flex min-h-screen items-center justify-center">

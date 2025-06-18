@@ -1,21 +1,10 @@
 
-// src/app/settings/layout.tsx
-import { LayoutComponent } from '@/components/Layout';
-import { BottomNavBar } from '@/components/BottomNavBar';
-import { ThemeManager } from '@/components/ThemeManager';
-
-export default function SettingsLayout({
+// This file is no longer used as settings functionality is moved to (app-user)/user-settings.
+// It can be safely deleted.
+export default function DeprecatedSettingsLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <>
-      <ThemeManager themeClass="" />
-      <LayoutComponent>
-        {children}
-      </LayoutComponent>
-      <BottomNavBar />
-    </>
-  );
+  return <>{children}</>;
 }

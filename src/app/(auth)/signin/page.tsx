@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, Loader2, ShieldCheck } from 'lucide-react'; // Added ShieldCheck
+import { LogIn, Loader2, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAppContext } from '@/contexts/AppContext';
@@ -29,9 +29,7 @@ export default function SignInPage() {
   };
 
   useEffect(() => {
-    // Only redirect if auth state is fully resolved (not loading, and we have authUser)
     if (!isLoadingAuth && authUser) {
-      // If userProfile is loaded, we can make role-based decisions
       if (userProfile) {
         const redirectParam = searchParams.get('redirect');
         if (redirectParam) {
@@ -39,16 +37,13 @@ export default function SignInPage() {
         } else if (userProfile.role === 'admin') {
           router.push('/admin/dashboard');
         } else {
-          router.push('/account');
+          router.push('/profile'); // Updated redirect to /profile
         }
       }
-      // If authUser exists but userProfile is not yet loaded, wait for the profile.
-      // This state is usually brief. The loader below handles it.
     }
   }, [authUser, userProfile, isLoadingAuth, router, searchParams]);
 
 
-  // Show main loader if auth state is initially loading and no user is yet detected
   if (isLoadingAuth && !authUser && !userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -56,10 +51,7 @@ export default function SignInPage() {
       </div>
     );
   }
-  
-  // If already logged in (authUser exists and auth not loading)
-  // and trying to access sign-in, show loader while redirecting.
-  // This also covers the case where authUser is set but userProfile is still loading for redirect decision.
+
   if (authUser && !isLoadingAuth) {
      return (
       <div className="flex min-h-screen items-center justify-center">

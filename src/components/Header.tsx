@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const desktopNavItems = [
-  { href: '/categories', label: 'Stores', icon: Layers }, // Updated href to /categories
-  { href: '/account', label: 'Account', icon: User },
+  { href: '/categories', label: 'Stores', icon: Layers },
+  { href: '/profile', label: 'Account', icon: User }, // Updated to /profile
   { href: '/help', label: 'Help', icon: HelpCircle },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon },
+  { href: '/user-settings', label: 'Settings', icon: SettingsIcon }, // Updated to /user-settings
 ];
 
 export function Header() {
@@ -45,7 +45,7 @@ export function Header() {
     searchFilterType,
     setSearchFilterType,
     authUser,
-    userProfile, 
+    userProfile,
     isLoadingAuth,
   } = useAppContext();
   const pathname = usePathname();
@@ -60,22 +60,21 @@ export function Header() {
 
   const categoriesList: SectionCategory[] = currentSectionConfig?.categories || [];
   const sectionName = currentSectionConfig?.name || 'BoutiqueBox';
-  const sectionPath = currentSectionConfig?.path || '/categories'; // Default to /categories
+  const sectionPath = currentSectionConfig?.path || '/categories';
 
 
   const isAppFeaturePage = pathname.startsWith('/grocery') ||
                            pathname.startsWith('/cosmetics') ||
                            pathname.startsWith('/fastfood') ||
-                           pathname.startsWith('/category/') || // For specific category product listings
-                           pathname === '/categories'; // New main categories page
-  
-  const isProductDetailPage = 
-    pathname.split('/').length >= 3 && 
+                           pathname.startsWith('/category/') ||
+                           pathname === '/categories';
+
+  const isProductDetailPage =
+    pathname.split('/').length >= 3 &&
     (pathname.startsWith('/grocery/') || pathname.startsWith('/cosmetics/') || pathname.startsWith('/fastfood/') || (pathname.startsWith('/category/') && !pathname.endsWith('/categories') && pathname.split('/').length > 2 ) );
 
 
   useEffect(() => {
-    // Reset search term if navigating away from a searchable page, unless it's the new categories page itself
     if (!isAppFeaturePage && pathname !== '/categories' && searchTerm) {
       setSearchTerm('');
     }
@@ -104,16 +103,19 @@ export function Header() {
 
 
   const numCategories = categoriesList.length;
-  const categoryArcRadius = 50; 
-  const yOffsetForArc = 10; 
-  const angleSpan = numCategories > 1 ? Math.min(120, numCategories * 30) : 0; 
+  const categoryArcRadius = 50;
+  const yOffsetForArc = 10;
+  const angleSpan = numCategories > 1 ? Math.min(120, numCategories * 30) : 0;
   const startAngle = numCategories > 1 ? -angleSpan / 2 : (numCategories === 1 ? 0 : 0);
-  const iconPixelWidth = 40; 
+  const iconPixelWidth = 40;
 
   const showCategoryArc = currentSectionConfig && categoriesList.length > 0 && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood'));
-  
+
   const showGlobalSearch = isAppFeaturePage && !isProductDetailPage && !showCategoryArc;
 
+
+  // Determine if user panel is active to adjust header styles or content
+  const isUserPanelActive = pathname.startsWith('/profile') || pathname.startsWith('/orders') || pathname.startsWith('/user-settings');
 
   return (
     <header
@@ -121,31 +123,33 @@ export function Header() {
       className={cn(
         "sticky top-0 z-40 w-full backdrop-blur supports-[backdrop-filter]:bg-opacity-65",
         "rounded-b-[25px]",
-        (currentSectionConfig && !pathname.startsWith('/categories')) // Apply section theme if not on global categories page
+        (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories'))
           ? "bg-[hsl(var(--header-bg-hsl)/0.85)] text-[hsl(var(--header-fg-hsl))] supports-[backdrop-filter]:bg-[hsl(var(--header-bg-hsl)/0.65)]"
-          : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65", // Default theme for /categories or other pages
+          : "bg-background/85 text-foreground supports-[backdrop-filter]:bg-background/65",
         "transition-transform duration-300 ease-in-out",
         !isHeaderVisible && "-translate-y-full"
       )}
     >
       <div className="container flex h-16 items-center justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
-          {isProductDetailPage ? (
-            <Button variant="ghost" size="icon" onClick={() => router.back()} className={cn((currentSectionConfig && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground", "mr-1 md:mr-2")}>
+          {isProductDetailPage || isUserPanelActive ? ( // Show back arrow on product detail OR user panel pages
+            <Button variant="ghost" size="icon" onClick={() => router.back()} className={cn((currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground", "mr-1 md:mr-2")}>
               <ArrowLeft className="h-6 w-6" />
             </Button>
           ) : null}
           <Link
-            href={sectionPath} 
+            href={isUserPanelActive ? "/profile" : sectionPath} // Link to profile if in panel, else section path
             className={cn(
               "flex items-center gap-2",
-              (currentSectionConfig && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
+              (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
             )}
           >
             <ShoppingBag className="h-7 w-7" />
-            <span className="font-headline text-xl md:text-2xl font-bold">{pathname.startsWith('/categories') ? 'BoutiqueBox' : sectionName}</span>
+            <span className="font-headline text-xl md:text-2xl font-bold">
+              {isUserPanelActive ? "My Panel" : (pathname.startsWith('/categories') ? 'BoutiqueBox' : sectionName)}
+            </span>
           </Link>
-          {currentSectionConfig && !isProductDetailPage && !pathname.startsWith('/categories') && (
+          {currentSectionConfig && !isProductDetailPage && !isUserPanelActive && !pathname.startsWith('/categories') && (
             <div className="hidden md:flex items-center gap-1 text-sm opacity-80">
               <MapPin className="h-4 w-4" />
               <span>Delivering to: CA, USA</span>
@@ -153,7 +157,7 @@ export function Header() {
           )}
         </div>
 
-        {showGlobalSearch && (
+        {showGlobalSearch && !isUserPanelActive && ( // Hide search if in user panel
           <div className="flex-1 min-w-0 px-2 md:px-4">
             <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md mx-auto flex items-center">
               <SearchIcon className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -161,15 +165,14 @@ export function Header() {
                 type="search"
                 placeholder={pathname === '/categories' ? "Search categories..." : "Search products..."}
                 className={cn(
-                  "w-full rounded-lg bg-transparent py-2 pl-8 h-9 text-sm pr-10", // Added pr-10 for filter button
-                   (currentSectionConfig && !pathname.startsWith('/categories'))
+                  "w-full rounded-lg bg-transparent py-2 pl-8 h-9 text-sm pr-10",
+                   (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories'))
                     ? "border-[hsl(var(--header-fg-hsl)/0.3)] text-[hsl(var(--header-fg-hsl))] placeholder:text-[hsl(var(--header-fg-hsl)/0.7)] focus:bg-[hsl(var(--background))] focus:text-foreground"
                     : "border-input placeholder:text-muted-foreground focus:bg-background/50"
                 )}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              {/* Product search filter - show if not on /categories page */}
               {currentSectionConfig && !pathname.startsWith('/categories') && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -178,7 +181,7 @@ export function Header() {
                       size="icon"
                       className={cn(
                         "absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7",
-                        (currentSectionConfig && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl)/0.8)] hover:bg-[hsl(var(--header-fg-hsl)/0.1)] hover:text-[hsl(var(--header-fg-hsl))]" : "text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground"
+                        (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl)/0.8)] hover:bg-[hsl(var(--header-fg-hsl)/0.1)] hover:text-[hsl(var(--header-fg-hsl))]" : "text-muted-foreground hover:bg-accent/10 hover:text-accent-foreground"
                       )}
                       aria-label="Search filter options"
                     >
@@ -202,49 +205,52 @@ export function Header() {
 
         <div className={cn(
           "flex items-center gap-x-1 sm:gap-x-2",
-          (currentSectionConfig && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
+          (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "text-[hsl(var(--header-fg-hsl))]" : "text-foreground"
         )}>
-          <nav className="hidden md:flex items-center gap-x-3 lg:gap-x-4">
-            {desktopNavItems.map((item) => {
-              const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/categories');
-              const ItemIcon = item.icon;
-              return (
+          {!isUserPanelActive && ( // Hide desktop nav items when in user panel
+            <nav className="hidden md:flex items-center gap-x-3 lg:gap-x-4">
+              {desktopNavItems.map((item) => {
+                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/categories' && item.href !== '/profile' && item.href !== '/user-settings');
+                const ItemIcon = item.icon;
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className={cn(
+                      "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
+                      isActive ? ((currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--header-fg-hsl)/0.15)] opacity-100" : "bg-primary/15 opacity-100 text-primary") : "opacity-90",
+                      (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
+                    )}
+                    title={item.label}
+                  >
+                    <ItemIcon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              {authUser && userProfile && userProfile.role === 'admin' && (
                 <Link
-                  key={item.label}
-                  href={item.href}
+                  href="/admin/dashboard"
                   className={cn(
                     "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
-                    isActive ? ((currentSectionConfig && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--header-fg-hsl)/0.15)] opacity-100" : "bg-primary/15 opacity-100 text-primary") : "opacity-90",
-                    (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
+                    pathname.startsWith('/admin') ? "bg-primary/15 opacity-100 text-primary" : "opacity-90",
+                    "hover:bg-accent/10"
                   )}
-                  title={item.label}
+                  title="Admin Panel"
                 >
-                  <ItemIcon className="h-4 w-4" />
-                  {item.label}
+                  <Shield className="h-4 w-4" />
+                  Admin
                 </Link>
-              );
-            })}
-            {authUser && userProfile && userProfile.role === 'admin' && (
-              <Link
-                href="/admin/dashboard"
-                className={cn(
-                  "text-sm font-medium transition-opacity hover:opacity-80 px-2 py-1 rounded-md flex items-center gap-1.5",
-                  pathname.startsWith('/admin') ? ((currentSectionConfig && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--header-fg-hsl)/0.15)] opacity-100" : "bg-primary/15 opacity-100 text-primary") : "opacity-90",
-                  (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)]" : "hover:bg-accent/10"
-                )}
-                title="Admin Panel"
-              >
-                <Shield className="h-4 w-4" />
-                Admin
-              </Link>
-            )}
-          </nav>
-
-          {(desktopNavItems.length > 0 || (authUser && userProfile && userProfile.role === 'admin')) && <div className={cn("hidden md:block h-6 w-px mx-2", (currentSectionConfig && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
+              )}
+            </nav>
+          )}
+          
+          {/* Separator, only if desktop nav items were shown */}
+          {!isUserPanelActive && (desktopNavItems.length > 0 || (authUser && userProfile && userProfile.role === 'admin')) && <div className={cn("hidden md:block h-6 w-px mx-2", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--header-fg-hsl)/0.3)]" : "bg-border")}></div>}
 
 
           <div className="flex items-center gap-x-0.5 sm:gap-x-1">
-            {currentSectionConfig && !pathname.startsWith('/categories') && !isProductDetailPage && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood')) && (
+            {currentSectionConfig && !pathname.startsWith('/categories') && !isProductDetailPage && !isUserPanelActive && (pathname.startsWith('/grocery') || pathname.startsWith('/cosmetics') || pathname.startsWith('/fastfood')) && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -252,7 +258,7 @@ export function Header() {
                 aria-label="Get Personalized Recommendations"
                 disabled={isLoadingRecommendations}
                 title="Personalized Recommendations"
-                className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
               >
                 <Lightbulb className="h-5 w-5 md:h-6 md:w-6" />
                 {isLoadingRecommendations && <span className="sr-only">Loading...</span>}
@@ -263,7 +269,7 @@ export function Header() {
               size="icon"
               onClick={toggleWishlist}
               aria-label="Open Wishlist"
-              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
               title="Wishlist"
             >
               <Heart className="h-5 w-5 md:h-6 md:w-6" />
@@ -278,48 +284,35 @@ export function Header() {
               size="icon"
               onClick={toggleCart}
               aria-label="Open Shopping Cart"
-              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+              className={cn("relative hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
               title="Shopping Cart"
             >
               <ShoppingCart className="h-5 w-5 md:h-6 md:w-6" />
               {cartItemCount > 0 && (
-                <Badge className={cn("absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs", (currentSectionConfig && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]" : "bg-accent text-accent-foreground" )}>
+                <Badge className={cn("absolute -top-1 -right-1 h-5 w-5 justify-center p-0 text-xs", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]" : "bg-accent text-accent-foreground" )}>
                   {cartItemCount}
                 </Badge>
               )}
             </Button>
+            {/* Auth User Icon: Always show User icon, links to /profile if logged in, else /signin */}
             {!isLoadingAuth && (
-              authUser ? (
-                <Link href="/account" passHref>
+              <Link href={authUser ? "/profile" : "/signin"} passHref>
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="My Account"
-                    className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-                    title="My Account"
+                    aria-label={authUser ? "My Account" : "Sign In"}
+                    className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !isUserPanelActive && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
+                    title={authUser ? "My Account" : "Sign In / Sign Up"}
                   >
-                    <User className="h-5 w-5 md:h-6 md:w-6" />
+                    { authUser ? <User className="h-5 w-5 md:h-6 md:w-6" /> : <LogIn className="h-5 w-5 md:h-6 md:w-6" /> }
                   </Button>
-                </Link>
-              ) : (
-                <Link href="/signin" passHref>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Sign In"
-                    className={cn("hover:bg-opacity-10 focus-visible:ring-current", (currentSectionConfig && !pathname.startsWith('/categories')) ? "hover:bg-[hsl(var(--header-fg-hsl)/0.1)] focus-visible:ring-[hsl(var(--header-fg-hsl))]" : "hover:bg-accent/10 focus-visible:ring-foreground")}
-                    title="Sign In / Sign Up"
-                  >
-                    <LogIn className="h-5 w-5 md:h-6 md:w-6" />
-                  </Button>
-                </Link>
-              )
+              </Link>
             )}
           </div>
         </div>
       </div>
 
-      {showCategoryArc && (
+      {showCategoryArc && !isUserPanelActive && (
          <div className="relative h-[70px] sm:h-[80px] flex justify-center items-start mt-1 mb-3 overflow-hidden">
           <div className="relative w-[300px] h-[120px] sm:w-[380px] sm:h-[120px] md:w-[450px] md:h-[120px]">
             {categoriesList.map((category, index) => {

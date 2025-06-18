@@ -1,21 +1,10 @@
 
-// src/app/account/layout.tsx
-import { LayoutComponent } from '@/components/Layout';
-import { BottomNavBar } from '@/components/BottomNavBar';
-import { ThemeManager } from '@/components/ThemeManager';
-
-export default function AccountLayout({
+// This file is no longer used as account functionality is moved to (app-user)/profile.
+// It can be safely deleted.
+export default function DeprecatedAccountLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <>
-      <ThemeManager themeClass="" />
-      <LayoutComponent>
-        {children}
-      </LayoutComponent>
-      <BottomNavBar />
-    </>
-  );
+  return <>{children}</>;
 }
