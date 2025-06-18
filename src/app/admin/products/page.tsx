@@ -36,7 +36,7 @@ export default function AdminProductsPage() {
   const fetchProductCategories = useCallback(async () => {
     setIsLoadingCategories(true);
     try {
-      const response = await fetch('/api/categories');
+      const response = await fetch('/api/categories'); // This fetches all categories
       if (!response.ok) {
         let errorDetail = `Server responded with status ${response.status}`;
         try {
@@ -62,7 +62,7 @@ export default function AdminProductsPage() {
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
-      const response = await fetch('/api/products');
+      const response = await fetch('/api/products'); // Fetches all products
       if (!response.ok) {
         let errorDetail = `Server responded with status ${response.status}`;
         try {
@@ -77,21 +77,22 @@ export default function AdminProductsPage() {
       const rawData = await response.json();
       const dataToFormat = Array.isArray(rawData) ? rawData : [];
 
+      // Transform raw Supabase product data to frontend Product type
       const formattedProducts: Product[] = dataToFormat.map((p: any) => {
-        const primaryImage = p.product_images?.find((img: any) => img.is_primary)?.image_url;
-        const categoryName = p.category_id?.name || 'Uncategorized';
-        const categoryId = p.category_id?.id;
+        const primaryImage = p.product_images?.find((img: any) => img.is_primary === true)?.image_url;
+        const categoryName = p.category_id?.name || 'Uncategorized'; // Use joined category name
+        const categoryId = p.category_id?.id; // Use joined category id
 
         return {
           id: p.id,
           name: p.name,
-          description: p.description,
-          price: parseFloat(p.price),
-          stock: p.stock,
-          category: categoryName,
-          category_id: categoryId,
-          image: primaryImage || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
-          'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
+          description: p.description || '',
+          price: parseFloat(p.price) || 0,
+          stock: parseInt(p.stock, 10) || 0,
+          category: categoryName, // This is the string name for display
+          category_id: categoryId, // This is the actual ID
+          image: primaryImage || `https://placehold.co/100x100.png?text=${p.name.substring(0,1).toUpperCase()}`,
+          'data-ai-hint': p.name.toLowerCase().split(' ').slice(0,2).join(' ') || 'product item', // Construct a hint if DB one is not used/available
         };
       });
       setProducts(formattedProducts);
@@ -134,7 +135,7 @@ export default function AdminProductsPage() {
         throw new Error(errorData.error || 'Failed to delete product');
       }
 
-      await fetchProducts();
+      await fetchProducts(); // Refetch products to update the list
       toast({ title: "Product Deleted", description: `Product has been removed.` });
     } catch (error) {
       console.error("Delete product error:", error);
@@ -169,16 +170,21 @@ export default function AdminProductsPage() {
       if(loadingToastId) toast.dismiss(loadingToastId);
       return;
     }
-    formData.append('brand_id', '1'); 
+    
+    // Handle brand_id - it's optional. ProductForm doesn't have a field for it yet.
+    // If you add brand_id to ProductFormSubmitData, you can append it here:
+    // if (data.brand_id) formData.append('brand_id', data.brand_id.toString());
+    // For now, the API will handle it as NULL if not sent or if it's an empty string.
 
     if (data.imageFile) {
       formData.append('imageFile', data.imageFile, data.imageFile.name);
     }
     if (isUpdating && data.currentImageUrl && !data.imageFile) {
-        formData.append('currentImageUrl', data.currentImageUrl);
+        // No need to append currentImageUrl, API PUT logic will preserve it if no new file
     }
-
-    formData.append('data_ai_hint', data['data-ai-hint'] || data.name.toLowerCase().split(' ')[0] || 'product');
+    
+    // data_ai_hint is not sent to API for products table to avoid "column does not exist" if schema is not updated.
+    // It is used for UI hints only.
 
     try {
       let response;
@@ -192,7 +198,7 @@ export default function AdminProductsPage() {
 
       response = await fetch(url, {
         method: method,
-        body: formData,
+        body: formData, // Sending as FormData for file upload
       });
 
       if (!response.ok) {
@@ -203,7 +209,7 @@ export default function AdminProductsPage() {
       const result = await response.json();
       if (result.success) {
         toast({ title: `Product ${isUpdating ? 'Updated' : 'Added'}`, description: `${data.name} has been successfully ${isUpdating ? 'updated' : 'added'}.` });
-        await fetchProducts();
+        await fetchProducts(); // Refetch products
         setIsFormOpen(false);
         setEditingProduct(null);
       } else {
@@ -223,12 +229,12 @@ export default function AdminProductsPage() {
     const nameMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const descriptionMatch = product.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSearch = nameMatch || descriptionMatch;
-    const matchesCategory = filterCategoryId === 'all' || product.category_id?.toString() === filterCategoryId;
+    const matchesCategory = filterCategoryId === 'all' || (product.category_id && product.category_id.toString() === filterCategoryId);
     return matchesSearch && matchesCategory;
   });
 
   const formSelectableCategories = allCategories.map(cat => ({
-    value: cat.id,
+    value: cat.id, // Use numeric ID
     label: cat.name,
   }));
 
@@ -243,7 +249,7 @@ export default function AdminProductsPage() {
         <Button 
           onClick={handleAddProduct} 
           size="lg" 
-          disabled={isSubmitting || ((isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0)}
+          disabled={isSubmitting || ((isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0 && !isSubmitting)}
         >
           {((isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0 && !isSubmitting) ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlusCircle className="mr-2 h-5 w-5" />}
           Add New Product
@@ -271,7 +277,7 @@ export default function AdminProductsPage() {
             <Select
                 value={filterCategoryId}
                 onValueChange={(value) => setFilterCategoryId(value)}
-                disabled={((isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0)}
+                disabled={((isLoadingProducts || isLoadingCategories) && products.length === 0 && allCategories.length === 0) || isLoadingCategories}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder={isLoadingCategories && allCategories.length === 0 ? "Loading categories..." : "Filter by category"} />
@@ -307,7 +313,7 @@ export default function AdminProductsPage() {
               {filteredProducts.length > 0 ? filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
-                    {product.image ? (
+                    {product.image && product.image !== `https://placehold.co/100x100.png?text=${product.name.substring(0,1).toUpperCase()}` ? (
                        <Image src={product.image} alt={product.name} width={48} height={48} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint'] || 'product'}/>
                     ) : (
                       <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center">
@@ -340,7 +346,7 @@ export default function AdminProductsPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center h-24">
-                    {products.length === 0 && !searchTerm && filterCategoryId === 'all' ? "No products yet. Click 'Add New Product' to get started!" : "No products found matching your search or filter."}
+                    {(isLoadingProducts || isLoadingCategories) ? "Loading..." : products.length === 0 && !searchTerm && filterCategoryId === 'all' ? "No products yet. Click 'Add New Product' to get started!" : "No products found matching your search or filter."}
                   </TableCell>
                 </TableRow>
               )}
@@ -356,7 +362,7 @@ export default function AdminProductsPage() {
         if (!isOpen) setEditingProduct(null);
       }}>
         <DialogContent className="sm:max-w-2xl p-0">
-          {isFormOpen && (
+          {isFormOpen && ( // Conditionally render Form to reset state on close/reopen
             <ProductForm
               product={editingProduct}
               onSubmit={handleFormSubmit}
@@ -368,8 +374,9 @@ export default function AdminProductsPage() {
         </DialogContent>
       </Dialog>
       <p className="text-sm text-muted-foreground text-center">
-        Product management interacts with API endpoints. Ensure backend and Supabase (RLS, Storage policies) are configured.
+        Product management interacts with API endpoints. Ensure backend and Supabase (RLS, Storage policies) are configured. Brands need to be added to the form for full functionality.
       </p>
     </div>
   );
 }
+

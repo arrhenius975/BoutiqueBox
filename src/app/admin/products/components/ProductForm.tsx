@@ -15,23 +15,25 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 
 export interface ProductFormSubmitData {
-  id?: string; // Present if editing an existing product
+  id?: string; 
   name: string;
   description: string;
-  price: string; // Will be parsed to float by backend
-  stock: string; // Will be parsed to int by backend
-  category_id: number | null; // Changed from category string to category_id number
+  price: string; 
+  stock: string; 
+  category_id: number | null; 
   imageFile: File | null;
-  currentImageUrl?: string; // URL of existing image if editing
- 'data-ai-hint'?: string;
+  currentImageUrl?: string; 
+ 'data-ai-hint'?: string; // This is for UI purposes, API will not save to products table if column doesn't exist
+  brand_id?: string | null; // For future use if brand selector is added
 }
 
 interface ProductFormProps {
-  product?: Product | null; // Product data if editing
+  product?: Product | null; 
   onSubmit: (data: ProductFormSubmitData) => void;
   onCancel: () => void;
   availableCategories: { value: number; label: string }[];
   isSubmitting?: boolean;
+  // availableBrands: { value: number; label: string }[]; // For future use
 }
 
 export function ProductForm({ product, onSubmit, onCancel, availableCategories, isSubmitting }: ProductFormProps) {
@@ -40,23 +42,23 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(''); // Store as string for Select component
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(''); 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [dataAiHint, setDataAiHint] = useState<string>('');
+  // const [selectedBrandId, setSelectedBrandId] = useState<string>(''); // For future use
 
   useEffect(() => {
     if (product) {
       setName(product.name);
       setDescription(product.description);
       setPrice(product.price.toString());
-      // @ts-ignore - product may not have stock property yet if data source is old
       setStock(product.stock?.toString() || '0');
-      setSelectedCategoryId(product.category_id ? product.category_id.toString() : ''); // Use product.category_id
-      setImagePreview(product.image);
+      setSelectedCategoryId(product.category_id ? product.category_id.toString() : ''); 
+      setImagePreview(product.image); // This uses the existing product image URL
       setDataAiHint(product['data-ai-hint'] || product.name.toLowerCase().split(' ')[0] || 'product');
+      // setSelectedBrandId(product.brand_id ? product.brand_id.toString() : ''); // For future use
     } else {
-      // Reset form for new product
       setName('');
       setDescription('');
       setPrice('');
@@ -65,6 +67,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       setImageFile(null);
       setImagePreview(null);
       setDataAiHint('');
+      // setSelectedBrandId(''); // For future use
     }
   }, [product]);
 
@@ -103,7 +106,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
         toast({ title: "Valid Stock Required", description: "Please enter a stock quantity of 0 or more.", variant: "destructive" });
         return;
     }
-    if (!product?.id && !imageFile) { // New product requires an image
+    if (!product?.id && !imageFile) { 
         toast({ title: "Image Required", description: "Please upload an image for the new product.", variant: "destructive" });
         return;
     }
@@ -114,13 +117,14 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
       description,
       price,
       stock,
-      category_id: parseInt(selectedCategoryId, 10), // Convert string ID back to number
+      category_id: parseInt(selectedCategoryId, 10), 
       imageFile,
-      currentImageUrl: product?.image,
+      currentImageUrl: product?.image, 
       'data-ai-hint': dataAiHint || name.toLowerCase().split(' ')[0] || 'product',
+      // brand_id: selectedBrandId ? selectedBrandId : null, // For future use
     });
   };
-
+  
   const isFormValid = name.trim() && price.trim() && parseFloat(price) > 0 && stock.trim() && parseInt(stock) >=0 && selectedCategoryId && (product?.id || imageFile);
 
 
@@ -160,7 +164,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
                 required
               >
                 <SelectTrigger id="category">
-                  <SelectValue placeholder={availableCategories.length === 0 ? "Loading categories..." : "Select category"} />
+                  <SelectValue placeholder={availableCategories.length === 0 ? "Loading..." : "Select category"} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableCategories.map(cat => (
@@ -170,17 +174,37 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
               </Select>
             </div>
           </div>
+           {/* Brand Selector - Future use
+           <div className="space-y-2">
+              <Label htmlFor="brand">Brand (Optional)</Label>
+              <Select
+                value={selectedBrandId}
+                onValueChange={(value) => setSelectedBrandId(value)}
+                disabled={isSubmitting || availableBrands.length === 0}
+              >
+                <SelectTrigger id="brand">
+                  <SelectValue placeholder={availableBrands.length === 0 ? "No brands" : "Select brand"} />
+                </SelectTrigger>
+                <SelectContent>
+                   <SelectItem value="">None</SelectItem> 
+                  {availableBrands.map(brand => (
+                    <SelectItem key={brand.value} value={brand.value.toString()}>{brand.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div> 
+           */}
            <div className="space-y-2">
             <Label htmlFor="dataAiHint">AI Image Hint (1-2 words)</Label>
             <Input 
               id="dataAiHint" 
               value={dataAiHint} 
               onChange={(e) => setDataAiHint(e.target.value)} 
-              placeholder="e.g. red apple, face cream, plush toy" 
+              placeholder="e.g. red apple, face cream" 
               disabled={isSubmitting}
             />
             <p className="text-xs text-muted-foreground">
-              Helps generate relevant placeholder images if no image is uploaded. Max 2 words.
+              Used for UI placeholders or potential AI image tools. Not saved to product database if column is missing.
             </p>
           </div>
           <div className="space-y-2">
@@ -189,7 +213,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
               <div className="space-y-1 text-center">
                 {imagePreview ? (
                   <div className="relative group mx-auto w-32 h-32">
-                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="contain" className="rounded-md" />
+                     <Image src={imagePreview} alt="Preview" layout="fill" objectFit="contain" className="rounded-md" data-ai-hint="product image preview"/>
                      <Button
                         type="button"
                         variant="destructive"
@@ -197,7 +221,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
                         className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 z-10"
                         onClick={() => {
                             setImageFile(null);
-                            setImagePreview(product?.id ? product.image : null);
+                            setImagePreview(product?.id ? product.image : null); // Revert to original if editing, else null
                             const fileInput = document.getElementById('image-upload') as HTMLInputElement;
                             if (fileInput) fileInput.value = "";
                         }}
@@ -215,7 +239,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
                     htmlFor="image-upload"
                     className={`relative cursor-pointer rounded-md font-medium text-primary hover:text-primary/80 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary ${isSubmitting ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
-                    <span>{imagePreview ? 'Change file' : 'Upload a file'}</span>
+                    <span>{imagePreview && imageFile ? 'Change file' : (imagePreview ? 'Change file' : 'Upload a file')}</span>
                     <Input id="image-upload" name="image" type="file" className="sr-only" onChange={handleImageChange} accept="image/png, image/jpeg, image/gif" disabled={isSubmitting} />
                   </label>
                   {!imageFile && !imagePreview && <p className="pl-1">or drag and drop</p>}
@@ -244,3 +268,4 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
     </Card>
   );
 }
+
