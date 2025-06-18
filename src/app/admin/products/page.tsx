@@ -79,7 +79,7 @@ export default function AdminProductsPage() {
 
       const formattedProducts: Product[] = dataToFormat.map((p: any) => {
         const primaryImage = p.product_images?.find((img: any) => img.is_primary)?.image_url;
-        const categoryName = p.category_id?.name || 'Uncategorized'; // Ensure category_id and its name are accessed safely
+        const categoryName = p.category_id?.name || 'Uncategorized';
         const categoryId = p.category_id?.id;
 
         return {
@@ -90,7 +90,7 @@ export default function AdminProductsPage() {
           stock: p.stock,
           category: categoryName,
           category_id: categoryId,
-          image: primaryImage || \`https://placehold.co/100x100.png?text=\${p.name.substring(0,1)}\`,
+          image: primaryImage || `https://placehold.co/100x100.png?text=${p.name.substring(0,1)}`,
           'data-ai-hint': p.data_ai_hint || p.name.toLowerCase().split(' ')[0] || 'product',
         };
       });
@@ -126,7 +126,7 @@ export default function AdminProductsPage() {
     setIsSubmitting(true);
     const loadingToastId = toast({ title: "Deleting product...", description: "Please wait.", duration: Infinity }).id;
     try {
-      const response = await fetch(`/api/products/\${productId}`, {
+      const response = await fetch(`/api/products/${productId}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -150,7 +150,7 @@ export default function AdminProductsPage() {
     const isUpdating = !!data.id;
     const actionVerb = isUpdating ? "Updating" : "Adding";
     const loadingToastId = toast({
-        title: `\${actionVerb} product...`,
+        title: `${actionVerb} product...`,
         description: "Please wait.",
         duration: Infinity
     }).id;
@@ -186,7 +186,7 @@ export default function AdminProductsPage() {
       let method = 'POST';
 
       if (isUpdating) {
-        url = `/api/products/\${data.id}`;
+        url = `/api/products/${data.id}`;
         method = 'PUT';
       }
 
@@ -196,23 +196,23 @@ export default function AdminProductsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `Server error during product \${isUpdating ? 'update' : 'creation'}.` }));
-        throw new Error(errorData.error || `Failed to \${isUpdating ? 'update' : 'add'} product`);
+        const errorData = await response.json().catch(() => ({ error: `Server error during product ${isUpdating ? 'update' : 'creation'}.` }));
+        throw new Error(errorData.error || `Failed to ${isUpdating ? 'update' : 'add'} product`);
       }
 
       const result = await response.json();
       if (result.success) {
-        toast({ title: `Product \${isUpdating ? 'Updated' : 'Added'}`, description: `\${data.name} has been successfully \${isUpdating ? 'updated' : 'added'}.` });
+        toast({ title: `Product ${isUpdating ? 'Updated' : 'Added'}`, description: `${data.name} has been successfully ${isUpdating ? 'updated' : 'added'}.` });
         await fetchProducts();
         setIsFormOpen(false);
         setEditingProduct(null);
       } else {
-        throw new Error(result.error || `Unknown error from API after \${isUpdating ? 'updating' : 'adding'} product.`);
+        throw new Error(result.error || `Unknown error from API after ${isUpdating ? 'updating' : 'adding'} product.`);
       }
 
     } catch (error) {
-      console.error(`Product \${isUpdating ? 'update' : 'submission'} error:`, error);
-      toast({ title: `Product \${isUpdating ? 'Update' : 'Add'} Failed`, description: (error as Error).message, variant: "destructive" });
+      console.error(`Product ${isUpdating ? 'update' : 'submission'} error:`, error);
+      toast({ title: `Product ${isUpdating ? 'Update' : 'Add'} Failed`, description: (error as Error).message, variant: "destructive" });
     } finally {
       if(loadingToastId) toast.dismiss(loadingToastId);
       setIsSubmitting(false);
@@ -319,9 +319,9 @@ export default function AdminProductsPage() {
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                      {product.category}
                   </TableCell>
-                  <TableCell>\${product.price.toFixed(2)}</TableCell>
+                  <TableCell>${product.price.toFixed(2)}</TableCell>
                   <TableCell>
-                    <span className={`font-medium \${product.stock <= 5 ? 'text-destructive' : (product.stock <= 20 ? 'text-yellow-600' : 'text-green-600')}`}>
+                    <span className={`font-medium ${product.stock <= 5 ? 'text-destructive' : (product.stock <= 20 ? 'text-yellow-600' : 'text-green-600')}`}>
                         {product.stock !== undefined ? product.stock : 'N/A'}
                     </span>
                   </TableCell>
@@ -373,5 +373,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
-    
