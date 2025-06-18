@@ -319,7 +319,7 @@ export default function AdminProductsPage() {
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                      {product.category}
                   </TableCell>
-                  <TableCell>${product.price.toFixed(2)}</TableCell>
+                  <TableCell>₹{product.price.toFixed(2)}</TableCell>
                   <TableCell>
                     <span className={`font-medium ${product.stock <= 5 ? 'text-destructive' : (product.stock <= 20 ? 'text-yellow-600' : 'text-green-600')}`}>
                         {product.stock !== undefined ? product.stock : 'N/A'}

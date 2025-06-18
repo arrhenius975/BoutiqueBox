@@ -117,7 +117,7 @@ export default function AdminSettingsPage() {
             <Label htmlFor="announcement-message">Announcement Message</Label>
             <Textarea
               id="announcement-message"
-              placeholder="E.g., Free shipping on orders over $50 this weekend!"
+              placeholder="E.g., Free shipping on orders over ₹2000 this weekend!"
               value={announcement.message}
               onChange={(e) => setAnnouncement(prev => ({ ...prev, message: e.target.value }))}
               disabled={isSaving}

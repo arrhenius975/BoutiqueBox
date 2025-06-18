@@ -28,7 +28,7 @@ export default function HelpPage() {
           <AccordionItem value="item-2">
             <AccordionTrigger>What are the delivery charges?</AccordionTrigger>
             <AccordionContent>
-              Delivery charges vary based on your location and order size. Standard delivery is often free for orders above a certain amount. Check the checkout page for specific charges.
+              Delivery charges vary based on your location and order size. Standard delivery is often free for orders above a certain amount (e.g., ₹2000). Check the checkout page for specific charges.
             </AccordionContent>
           </AccordionItem>
           <AccordionItem value="item-3">
@@ -71,7 +71,7 @@ export default function HelpPage() {
             </CardContent>
             <CardFooter>
               <Button asChild className="w-full">
-                <a href="mailto:boutiquebox788@gmail.com">Email Us</a>
+                <a href="mailto:barakOnlineStore788@gmail.com">Email Us</a>
               </Button>
             </CardFooter>
           </Card>

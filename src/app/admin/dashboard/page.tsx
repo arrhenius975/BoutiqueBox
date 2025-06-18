@@ -133,7 +133,9 @@ export default function AdminDashboardPage() {
                 <DollarSign className="h-5 w-5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${(stats.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                <div className="text-2xl font-bold">
+                  {(stats.totalRevenue || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </div>
                 <p className="text-xs text-muted-foreground">(Based on fetched daily data for last 30 days)</p>
               </CardContent>
             </Card>
@@ -183,10 +185,10 @@ export default function AdminDashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} interval="preserveStartEnd"/>
                       <YAxis 
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                        tickFormatter={(value) => `₹${value.toLocaleString('en-IN', {maximumFractionDigits:0})}`}
                         tick={{ fontSize: 12 }}
                       />
-                      <Tooltip content={<ChartTooltipContent formatter={(value) => `$${Number(value).toLocaleString()}`} />} />
+                      <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} />} />
                       <Legend content={<ChartLegendContent />} />
                       <Line type="monotone" dataKey="revenue" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
                     </LineChart>
@@ -242,4 +244,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-

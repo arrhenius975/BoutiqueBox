@@ -140,7 +140,7 @@ export default function AdminOrdersPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {format(new Date(order.date), 'MMM dd, yyyy p')}
                   </TableCell>
-                  <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell>₹{order.totalAmount.toFixed(2)}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(order.status)} className="capitalize">{order.status}</Badge>
                   </TableCell>

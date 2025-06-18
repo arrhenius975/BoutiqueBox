@@ -36,7 +36,7 @@ export function ProductCard({ product }: ProductCardProps) {
       </CardHeader>
       <CardContent className="flex-grow p-4">
         <CardTitle className="font-headline text-lg mb-1">{product.name}</CardTitle>
-        <p className="text-primary font-semibold text-base mb-2">${product.price.toFixed(2)}</p>
+        <p className="text-primary font-semibold text-base mb-2">₹{product.price.toFixed(2)}</p>
         <CardDescription className="text-sm text-muted-foreground line-clamp-3">{product.description}</CardDescription>
       </CardContent>
       <CardFooter className="flex gap-2 p-4 pt-0">

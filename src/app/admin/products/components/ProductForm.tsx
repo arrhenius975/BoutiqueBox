@@ -1,3 +1,4 @@
+
 // src/app/admin/products/components/ProductForm.tsx
 "use client";
 
@@ -143,7 +144,7 @@ export function ProductForm({ product, onSubmit, onCancel, availableCategories, 
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="price">Price ($) <span className="text-destructive">*</span></Label>
+              <Label htmlFor="price">Price (₹) <span className="text-destructive">*</span></Label>
               <Input id="price" type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required disabled={isSubmitting} min="0.01" />
             </div>
             <div className="space-y-2">

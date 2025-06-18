@@ -67,7 +67,7 @@ export function CartSidebar() {
       });
       clearCart();
       toggleCart(); // Close cart sidebar
-      router.push('/account/orders'); // Redirect to order history
+      router.push('/orders'); // Redirect to order history (assuming new /orders path)
 
     } catch (error) {
       console.error("Checkout error:", error);
@@ -108,7 +108,7 @@ export function CartSidebar() {
                       </div>
                       <div className="flex-1">
                         <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground">${item.price.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">₹{item.price.toFixed(2)}</p>
                         <div className="mt-2 flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -163,7 +163,7 @@ export function CartSidebar() {
                 <div className="flex w-full flex-col gap-4">
                   <div className="flex justify-between font-semibold">
                     <span>Subtotal</span>
-                    <span>${totalAmount.toFixed(2)}</span>
+                    <span>₹{totalAmount.toFixed(2)}</span>
                   </div>
                   <Button size="lg" className="w-full" onClick={handleInitiateCheckout} disabled={isProcessingCheckout || cart.length === 0}>
                     {isProcessingCheckout && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -191,14 +191,14 @@ export function CartSidebar() {
             </DialogTitle>
             <DialogDescription>
               Scan the QR code below with your preferred payment app to pay 
-              <span className="font-bold"> ${totalAmount.toFixed(2)}</span>.
+              <span className="font-bold"> ₹{totalAmount.toFixed(2)}</span>.
               After payment, click 'Confirm Payment & Place Order'.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 flex flex-col items-center gap-4">
             <div className="relative w-56 h-56 sm:w-64 sm:h-64 border rounded-md p-2 bg-white">
               <Image
-                src={`https://placehold.co/250x250.png?text=Scan+to+Pay+\$${totalAmount.toFixed(2)}`}
+                src={`https://placehold.co/250x250.png?text=Scan+to+Pay+₹${totalAmount.toFixed(2)}`}
                 alt="Payment QR Code"
                 layout="fill"
                 objectFit="contain"

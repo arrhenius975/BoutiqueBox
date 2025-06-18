@@ -188,15 +188,15 @@ export default function UserOrderHistoryPage() {
                       </div>
                       <div className="flex-grow">
                         <h4 className="font-medium">{item.name}</h4>
-                        <p className="text-sm text-muted-foreground">Qty: {item.quantity} &bull; Price: ${item.price.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground">Qty: {item.quantity} &bull; Price: ₹{item.price.toFixed(2)}</p>
                       </div>
-                      <p className="font-semibold">${(item.quantity * item.price).toFixed(2)}</p>
+                      <p className="font-semibold">₹{(item.quantity * item.price).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
                 <Separator className="my-4 md:my-6" />
                 <div className="flex justify-end items-center">
-                  <p className="text-lg font-semibold">Total: ${order.totalAmount.toFixed(2)}</p>
+                  <p className="text-lg font-semibold">Total: ₹{order.totalAmount.toFixed(2)}</p>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/50 dark:bg-muted/20 p-4 border-t flex flex-col sm:flex-row justify-end items-center gap-2">
