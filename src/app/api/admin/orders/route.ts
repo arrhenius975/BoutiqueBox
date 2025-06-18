@@ -27,7 +27,7 @@ async function isAdminCheck(supabaseClient: ReturnType<typeof createRouteHandler
     .select('role')
     .eq('auth_id', user.id)
     .single();
-  
+
   if (profileError) {
     console.error(`isAdminCheck (orders API): Error fetching profile for auth_id ${user.id}:`, profileError);
     return { isAdminUser: false, errorResponse: NextResponse.json({ error: `Could not fetch user profile: ${profileError.message}` }, { status: 500 }) };
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
   try {
     const { data: rawOrderData, error: ordersError } = await supabase
       .from('orders')
-      .select(\`
+      .select(`
         id,
         created_at,
         status,
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
             )
           )
         )
-      \`)
+      `)
       .order('created_at', { ascending: false });
 
     if (ordersError) {
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
           name: productName,
           quantity: item.quantity || 0,
           price: parseFloat(item.price || '0'), // Ensure price is a number, default to 0 if null/undefined
-          image: primaryImage || \`https://placehold.co/80x80.png?text=\${productName.substring(0,1).toUpperCase() || 'P'}\`,
+          image: primaryImage || `https://placehold.co/80x80.png?text=${productName.substring(0,1).toUpperCase() || 'P'}`,
           'data-ai-hint': product?.data_ai_hint || productName.toLowerCase().split(' ')[0] || 'item',
         };
       });
