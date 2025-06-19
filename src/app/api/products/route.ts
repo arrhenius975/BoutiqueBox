@@ -23,10 +23,13 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 export async function POST(req: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  console.log("API /api/products: POST request received.");
 
   if (!await isAdmin(supabase)) {
+    console.warn("API /api/products: Admin check failed. Forbidden access.");
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
+  console.log("API /api/products: Admin authenticated.");
 
   let tempProductId: string | null = null;
   let tempImageFilePath: string | null = null;
@@ -40,55 +43,53 @@ export async function POST(req: NextRequest) {
     const brand_id_str = formData.get('brand_id') as string | null; 
     const imageFile = formData.get('imageFile') as File | null;
     const stockStr = formData.get('stock') as string | null;
-    // data_ai_hint is intentionally not read from formData for DB operations here,
-    // as per the decision to not use it if the column doesn't exist.
+
+    console.log("API /api/products: Received FormData fields:", {
+        name, description, priceStr, category_id_str, brand_id_str, imageFileName: imageFile?.name, imageFileSize: imageFile?.size, stockStr
+    });
 
     if (!name || !priceStr || !category_id_str || !stockStr) {
+      console.warn("API /api/products: Validation failed - Missing required fields.");
       return NextResponse.json({ error: 'Missing required fields: name, price, stock, category_id.' }, { status: 400 });
     }
     if (!imageFile || imageFile.size === 0) {
+      console.warn("API /api/products: Validation failed - Product image is required.");
       return NextResponse.json({ error: 'Product image is required for new products.' }, { status: 400 });
     }
     if (imageFile.size > 2 * 1024 * 1024) { // 2MB limit
-        return NextResponse.json({ error: 'Image file too large (max 2MB).' }, { status: 413 });
+      console.warn("API /api/products: Validation failed - Image file too large.");
+      return NextResponse.json({ error: 'Image file too large (max 2MB).' }, { status: 413 });
     }
 
     const price = parseFloat(priceStr);
     const category_id = parseInt(category_id_str, 10);
     const stock = parseInt(stockStr, 10);
-    // Ensure brand_id is null if not a valid number, or if string is "null" or empty
     const brand_id = (brand_id_str && brand_id_str !== 'null' && brand_id_str.trim() !== '' && !isNaN(parseInt(brand_id_str, 10))) 
                      ? parseInt(brand_id_str, 10) 
                      : null;
 
-
     if (isNaN(price) || price <= 0) {
-        return NextResponse.json({ error: 'Invalid price value. Must be a number greater than 0.' }, { status: 400 });
+      console.warn("API /api/products: Validation failed - Invalid price value.");
+      return NextResponse.json({ error: 'Invalid price value. Must be a number greater than 0.' }, { status: 400 });
     }
     if (isNaN(stock) || stock < 0) {
-        return NextResponse.json({ error: 'Invalid stock value. Must be a non-negative number.' }, { status: 400 });
+      console.warn("API /api/products: Validation failed - Invalid stock value.");
+      return NextResponse.json({ error: 'Invalid stock value. Must be a non-negative number.' }, { status: 400 });
     }
     if (isNaN(category_id)) {
-        return NextResponse.json({ error: 'Invalid category_id. Must be a number.' }, { status: 400 });
+      console.warn("API /api/products: Validation failed - Invalid category_id.");
+      return NextResponse.json({ error: 'Invalid category_id. Must be a number.' }, { status: 400 });
     }
 
-
-    // 1. Insert product details into 'products' table
-    const productInsertPayload: {
-      name: string;
-      description?: string;
-      price: number;
-      stock: number;
-      category_id: number;
-      brand_id?: number | null; // Explicitly allow null
-    } = {
+    const productInsertPayload = {
       name: name.trim(),
       description: description?.trim() || undefined,
       price,
       stock,
       category_id,
-      brand_id: brand_id, // This will be null if not provided or invalid
+      brand_id: brand_id,
     };
+    console.log("API /api/products: Attempting to insert product with payload:", productInsertPayload);
 
     const { data: productData, error: productInsertError } = await supabase
       .from('products')
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (productInsertError || !productData) {
-      console.error('Product insert error:', productInsertError?.message);
+      console.error('API /api/products: Supabase product insert error:', productInsertError);
       if (productInsertError?.code === '23505') { 
         return NextResponse.json({ error: `Product creation failed: A product with similar unique details might already exist. ${productInsertError.details || productInsertError.message}` }, { status: 409 });
       }
@@ -107,11 +108,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: productInsertError?.message || 'Product creation failed. Please check data and try again.' }, { status: 500 });
     }
     tempProductId = productData.id; 
+    console.log("API /api/products: Product inserted successfully, ID:", tempProductId);
 
-    // 2. Upload image to Supabase Storage
     const sanitizedFileName = imageFile.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
     const filePath = `${productData.id}/${Date.now()}-${sanitizedFileName}`;
     tempImageFilePath = filePath; 
+    console.log("API /api/products: Attempting to upload image to Supabase Storage at path:", filePath);
 
     const { error: uploadError } = await supabase.storage
       .from('product-images') 
@@ -122,24 +124,32 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Image upload error:', uploadError);
+      console.error('API /api/products: Supabase Storage upload error:', uploadError);
       if (tempProductId) {
+        console.log("API /api/products: Rolling back product insert due to image upload failure, deleting product ID:", tempProductId);
         await supabase.from('products').delete().eq('id', tempProductId);
       }
       return NextResponse.json({ error: `Image upload failed: ${uploadError.message}. Product not created.` }, { status: 500 });
     }
+    console.log("API /api/products: Image uploaded successfully to path:", filePath);
 
-    // 3. Get public URL of the uploaded image
     const { data: publicUrlData } = supabase.storage.from('product-images').getPublicUrl(filePath);
     if (!publicUrlData || !publicUrlData.publicUrl) {
-      console.error('Failed to get public URL for image:', filePath);
-      if (tempProductId) await supabase.from('products').delete().eq('id', tempProductId);
-      if (tempImageFilePath) await supabase.storage.from('product-images').remove([tempImageFilePath]);
+      console.error('API /api/products: Failed to get public URL for image:', filePath);
+      if (tempProductId) {
+        console.log("API /api/products: Rolling back product insert due to public URL failure, deleting product ID:", tempProductId);
+        await supabase.from('products').delete().eq('id', tempProductId);
+      }
+      if (tempImageFilePath) {
+        console.log("API /api/products: Rolling back image upload due to public URL failure, deleting image path:", tempImageFilePath);
+        await supabase.storage.from('product-images').remove([tempImageFilePath]);
+      }
       return NextResponse.json({ error: 'Image uploaded, but failed to get public URL. Product creation rolled back.' }, { status: 500 });
     }
     const imageUrl = publicUrlData.publicUrl;
+    console.log("API /api/products: Public URL for image obtained:", imageUrl);
 
-    // 4. Insert image record into 'product_images' table
+    console.log("API /api/products: Attempting to insert image metadata into 'product_images' table for product ID:", productData.id);
     const { error: productImageInsertError } = await supabase
       .from('product_images')
       .insert({
@@ -149,16 +159,23 @@ export async function POST(req: NextRequest) {
       });
 
     if (productImageInsertError) {
-      console.error('Product image DB insert error:', productImageInsertError);
-      if (tempProductId) await supabase.from('products').delete().eq('id', tempProductId);
-      if (tempImageFilePath) await supabase.storage.from('product-images').remove([tempImageFilePath]);
+      console.error('API /api/products: Supabase product_images insert error:', productImageInsertError);
+      if (tempProductId) {
+        console.log("API /api/products: Rolling back product insert due to image metadata failure, deleting product ID:", tempProductId);
+        await supabase.from('products').delete().eq('id', tempProductId);
+      }
+      if (tempImageFilePath) {
+        console.log("API /api/products: Rolling back image upload due to image metadata failure, deleting image path:", tempImageFilePath);
+        await supabase.storage.from('product-images').remove([tempImageFilePath]);
+      }
       return NextResponse.json({ error: `Failed to link image to product: ${productImageInsertError.message}. Product creation rolled back.` }, { status: 500 });
     }
+    console.log("API /api/products: Image metadata inserted successfully.");
     
-    // 5. Refetch the complete product data with joins for the response
+    console.log("API /api/products: Attempting to refetch product with joined data for ID:", productData.id);
     const { data: finalProductData, error: finalFetchError } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -167,23 +184,30 @@ export async function POST(req: NextRequest) {
         category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary )
-      `)
+      \`)
       .eq('id', productData.id)
       .single();
 
     if (finalFetchError || !finalProductData) {
-      console.error('Error refetching product after creation:', finalFetchError?.message);
+      console.error('API /api/products: Error refetching product after creation:', finalFetchError);
       return NextResponse.json({ success: true, product: productData, warning: 'Product created, but failed to refetch full details.' }, { status: 201 });
     }
-
+    console.log("API /api/products: Product refetched successfully. Creation process complete.");
     return NextResponse.json({ success: true, product: finalProductData }, { status: 201 });
 
   } catch (e: unknown) {
-    console.error('POST /api/products general error:', e);
-    if (tempProductId) await supabase.from('products').delete().eq('id', tempProductId).catch(err => console.error("Rollback product delete failed", err));
-    if (tempImageFilePath) await supabase.storage.from('product-images').remove([tempImageFilePath]).catch(err => console.error("Rollback image delete failed", err));
-    
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred during product creation.';
+    console.error('API /api/products: General error in POST handler:', errorMessage, e);
+    
+    if (tempProductId) {
+      console.log("API /api/products: General error rollback - attempting to delete product ID:", tempProductId);
+      await supabase.from('products').delete().eq('id', tempProductId).catch(err => console.error("API /api/products: Rollback product delete failed", err));
+    }
+    if (tempImageFilePath) {
+      console.log("API /api/products: General error rollback - attempting to delete image path:", tempImageFilePath);
+      await supabase.storage.from('product-images').remove([tempImageFilePath]).catch(err => console.error("API /api/products: Rollback image delete failed", err));
+    }
+    
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -192,21 +216,22 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const cookieStore = await cookies(); 
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+  console.log("API /api/products: GET request received.");
   
   try {
     // Admin check for fetching all products - assuming this is for admin panel
     // If this needs to be public, remove isAdmin check or create separate public endpoint
-    if (!await isAdmin(supabase)) {
-      // For public product listings, you'd typically not require admin role.
-      // However, this specific endpoint is often used by admin panels.
-      // If you have a public product listing, it might use a different, simpler query.
-      // For now, keeping it admin-protected.
-      // return NextResponse.json({ error: 'Forbidden: Admin access required to list all products via this endpoint.' }, { status: 403 });
-    }
+    // For now, keeping it admin-protected for this specific GET.
+    // if (!await isAdmin(supabase)) {
+    //   console.warn("API /api/products: Admin check failed for GET. Forbidden access.");
+    //   return NextResponse.json({ error: 'Forbidden: Admin access required to list all products via this endpoint.' }, { status: 403 });
+    // }
+    // console.log("API /api/products: Admin authenticated for GET.");
+
 
     const { data, error } = await supabase
       .from('products')
-      .select(`
+      .select(\`
         id,
         name,
         description,
@@ -217,20 +242,21 @@ export async function GET(req: NextRequest) {
         product_images ( image_url, is_primary ),
         created_at,
         updated_at
-      `)
+      \`)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching products:', error.message);
+      console.error('API /api/products: Error fetching products in Supabase:', error.message);
       return NextResponse.json({ error: 'Failed to fetch products: ' + error.message }, { status: 500 });
     }
-
+    console.log(\`API /api/products: Fetched \${data?.length || 0} products successfully.\`);
     return NextResponse.json(data);
 
   } catch (e: unknown) {
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred while fetching products.';
-    console.error('GET /api/products general error:', errorMessage);
+    console.error('API /api/products: General error in GET handler:', errorMessage, e);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+    
     

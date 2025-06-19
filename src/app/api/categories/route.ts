@@ -23,67 +23,58 @@ export async function POST(req: NextRequest) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
+  console.log("API /api/categories: POST request received.");
+
   if (!await isAdmin(supabase)) {
+    console.warn("API /api/categories: Admin check failed. Forbidden access.");
     return NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
   }
+  console.log("API /api/categories: Admin authenticated.");
 
   try {
-    const { name, description } = await req.json();
+    const body = await req.json();
+    const { name, description } = body;
+    console.log("API /api/categories: Received payload:", { name, description });
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
+      console.warn("API /api/categories: Validation failed - Category name is required.");
       return NextResponse.json({ error: 'Category name is required and must be a non-empty string.' }, { status: 400 });
     }
 
+    const insertPayload = { 
+      name: name.trim(), 
+      description: description?.trim() || null 
+    };
+    console.log("API /api/categories: Attempting to insert category with payload:", insertPayload);
+
     const { data, error } = await supabase
       .from('categories')
-      .insert([{ name: name.trim(), description: description?.trim() || null }])
+      .insert([insertPayload])
       .select()
       .single();
 
     if (error) {
+      console.error('API /api/categories: Error creating category in Supabase:', error);
       if (error.code === '23505') { // Unique violation
         return NextResponse.json({ error: `Category name '${name.trim()}' already exists.` }, { status: 409 });
       }
-      console.error('Error creating category:', error);
       return NextResponse.json({ error: error.message || 'Failed to create category.' }, { status: 500 });
     }
 
+    console.log("API /api/categories: Category created successfully:", data);
     return NextResponse.json({ success: true, category: data }, { status: 201 });
   } catch (e: unknown) {
-    console.error('POST /api/categories general error:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
+    console.error('API /api/categories: General error in POST handler:', errorMessage, e);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 export async function GET(req: NextRequest) {
-  // The public GET handler for all categories is being temporarily disabled
-  // as the public-facing dynamic category pages are being simplified/removed.
-  // Admin panel can still fetch categories if it uses a different mechanism or if this GET
-  // is restricted to admin roles (which it currently is not).
-  // For now, returning a message indicating it's not for public use.
-  // If admin panel relies on this to list categories for product forms, it might need adjustment
-  // or this GET endpoint might need to be admin-protected.
-  // For simplicity to resolve build issues, we are making it unavailable.
-  // Admin products page already fetches categories separately.
-
-  // Re-instating admin-only GET for categories to support Admin Panel (e.g. product form dropdown)
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-  // Only admins should be able to list all categories through this generic GET
-  // (even though product form might fetch them without auth on client side for simplicity,
-  // a dedicated admin endpoint for this is better)
-  // However, to keep it simple and ensure product form works,
-  // we allow fetching if it's for admin UI context.
-  // A truly public GET for categories is what's being deprecated.
-  // The AdminProductsPage already fetches categories.
-  // The ProductForm gets categories passed as props.
-  // So, this public GET can be simplified to say it's not available.
-
-  // Let's restore a basic GET functionality for categories, as the admin panel
-  // (e.g., for populating dropdowns in product forms) might still rely on it.
-  // The *public display* of dynamic categories is what we're removing.
+  console.log("API /api/categories: GET request received.");
+  
   try {
     const { data, error } = await supabase
       .from('categories')
@@ -91,14 +82,15 @@ export async function GET(req: NextRequest) {
       .order('name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching categories:', error);
+      console.error('API /api/categories: Error fetching categories in Supabase:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
+    console.log(`API /api/categories: Fetched ${data?.length || 0} categories successfully.`);
     return NextResponse.json(data);
   } catch (e: unknown) {
-    console.error('GET /api/categories general error:', e);
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
+    console.error('API /api/categories: General error in GET handler:', errorMessage, e);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+    
