@@ -3,20 +3,21 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2, Info } from 'lucide-react'; // Added Info
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Added Alert components
+import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2, Info, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
+import { Button } from "@/components/ui/button";
 
 interface RevenueDataPoint {
-  day: string; 
+  day: string;
   revenue: number;
 }
 interface SignupDataPoint {
-  day: string; 
+  day: string;
   signup_count: number;
 }
 interface InventoryStatus {
@@ -26,11 +27,11 @@ interface InventoryStatus {
 }
 
 interface ChartRevenueData {
-  name: string; 
+  name: string;
   revenue: number;
 }
 interface ChartSignupData {
-  name: string; 
+  name: string;
   signups: number;
 }
 
@@ -42,9 +43,9 @@ interface DashboardStats {
 }
 
 interface AnalyticsApiResponse {
-  revenue: RevenueDataPoint[];
+  revenue: RevenueDataPoint[] | ChartRevenueData[];
   inventory: InventoryStatus[];
-  signups: SignupDataPoint[];
+  signups: SignupDataPoint[] | ChartSignupData[];
   stats: DashboardStats;
 }
 
@@ -53,7 +54,7 @@ export default function AdminDashboardPage() {
   const [revenueChartData, setRevenueChartData] = useState<ChartRevenueData[]>([]);
   const [signupChartData, setSignupChartData] = useState<ChartSignupData[]>([]);
   // const [inventorySummary, setInventorySummary] = useState<InventoryStatus[]>([]); // For future use
-  
+
   const [stats, setStats] = useState<DashboardStats>({
     totalRevenue: 0,
     totalOrders: 0,
@@ -61,47 +62,56 @@ export default function AdminDashboardPage() {
     conversionRate: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null); // New state for fetch errors
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/admin/analytics');
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics data.' }));
-          throw new Error(errorData.error || `Server responded with status ${response.status}`);
-        }
-        const data: AnalyticsApiResponse = await response.json();
-        
-        const processedRevenueData = (data.revenue || []).map(item => ({
-          name: format(new Date(item.day), 'MMM dd'),
-          revenue: item.revenue,
-        })).slice(-30); // Ensure data.revenue is treated as array
-        setRevenueChartData(processedRevenueData);
-
-        const processedSignupData = (data.signups || []).map(item => ({
-          name: format(new Date(item.day), 'MMM dd'),
-          signups: item.signup_count,
-        })).slice(-30); // Ensure data.signups is treated as array
-        setSignupChartData(processedSignupData);
-
-        // setInventorySummary(data.inventory || []); // Ensure data.inventory is treated as array
-        setStats(data.stats || { totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
-
-      } catch (error) {
-        console.error("Error fetching admin analytics:", error);
-        toast({ title: "Analytics Error", description: (error as Error).message, variant: "destructive" });
-        // Set to default empty/zero states on error
-        setRevenueChartData([]);
-        setSignupChartData([]);
-        setStats({ totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
-      } finally {
-        setIsLoading(false);
+  const fetchAnalytics = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null); // Reset error state on new fetch
+    try {
+      const response = await fetch('/api/admin/analytics');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch analytics data and parse error response.' }));
+        throw new Error(errorData.error || `Server responded with status ${response.status}`);
       }
-    };
-    fetchAnalytics();
+      const data: AnalyticsApiResponse = await response.json();
+
+      // Ensure data.revenue and data.signups are arrays before mapping
+      const rawRevenueData = Array.isArray(data.revenue) ? data.revenue : [];
+      const rawSignupData = Array.isArray(data.signups) ? data.signups : [];
+
+      const processedRevenueData = rawRevenueData.map(item => ({
+        name: format(new Date(item.day), 'MMM dd'), // Assuming 'day' is a valid date string
+        revenue: (item as RevenueDataPoint).revenue || 0, // Ensure revenue is a number
+      })).slice(-30);
+      setRevenueChartData(processedRevenueData);
+
+      const processedSignupData = rawSignupData.map(item => ({
+        name: format(new Date(item.day), 'MMM dd'), // Assuming 'day' is a valid date string
+        signups: (item as SignupDataPoint).signup_count || 0, // Ensure signup_count is a number
+      })).slice(-30);
+      setSignupChartData(processedSignupData);
+
+      // setInventorySummary(Array.isArray(data.inventory) ? data.inventory : []);
+      setStats(data.stats || { totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
+
+    } catch (error) {
+      console.error("Error fetching admin analytics:", error);
+      const errorMessage = (error as Error).message;
+      setFetchError(errorMessage);
+      toast({ title: "Analytics Error", description: errorMessage, variant: "destructive" });
+      // Set to default empty/zero states on error
+      setRevenueChartData([]);
+      setSignupChartData([]);
+      setStats({ totalRevenue: 0, totalOrders: 0, activeUsers: 0, conversionRate: 0 });
+    } finally {
+      setIsLoading(false);
+    }
   }, [toast]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
 
   const chartConfig = {
@@ -112,19 +122,38 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your e-commerce operations.</p>
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center">
+        <div>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Overview of your e-commerce operations.</p>
+        </div>
+        <Button onClick={fetchAnalytics} disabled={isLoading} variant="outline" size="sm">
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Refresh Data
+        </Button>
       </header>
 
       {isLoading && (
-        <div className="flex justify-center items-center py-10">
+        <div className="flex justify-center items-center py-10 h-64">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-3 text-muted-foreground">Loading analytics data...</p>
         </div>
       )}
 
-      {!isLoading && (
+      {!isLoading && fetchError && (
+        <Alert variant="destructive" className="max-w-2xl mx-auto">
+          <AlertTriangle className="h-5 w-5" />
+          <AlertTitle>Error Loading Analytics</AlertTitle>
+          <AlertDescription>
+            {fetchError}
+            <Button onClick={fetchAnalytics} variant="link" className="p-0 h-auto ml-2 text-destructive hover:text-destructive/80">
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!isLoading && !fetchError && (
         <>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -184,7 +213,7 @@ export default function AdminDashboardPage() {
                     <LineChart data={revenueChartData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} interval="preserveStartEnd"/>
-                      <YAxis 
+                      <YAxis
                         tickFormatter={(value) => `₹${value.toLocaleString('en-IN', {maximumFractionDigits:0})}`}
                         tick={{ fontSize: 12 }}
                       />
@@ -195,7 +224,7 @@ export default function AdminDashboardPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 ) : (
-                  <p className="text-center text-muted-foreground py-10">No revenue data available for the selected period. Ensure 'revenue_over_time' view is set up.</p>
+                  <p className="text-center text-muted-foreground py-10">No revenue data available for the selected period. Ensure 'revenue_over_time' view is set up in Supabase.</p>
                 )}
               </CardContent>
             </Card>
@@ -219,7 +248,7 @@ export default function AdminDashboardPage() {
                   </ResponsiveContainer>
                 </ChartContainer>
                 ) : (
-                   <p className="text-center text-muted-foreground py-10">No signup data available for the selected period. Ensure 'new_signups_over_time' view is set up.</p>
+                   <p className="text-center text-muted-foreground py-10">No signup data available for the selected period. Ensure 'new_signups_over_time' view is set up in Supabase.</p>
                 )}
               </CardContent>
             </Card>
