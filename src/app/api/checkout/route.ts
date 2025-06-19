@@ -13,11 +13,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
     
-    // Fetch the user's profile ID from public.users using their auth_id
-    // This is crucial because orders.user_id should reference public.users.id (UUID)
     const { data: userProfile, error: profileError } = await supabase
       .from('users')
-      .select('id') // Assuming 'id' in public.users is the UUID primary key
+      .select('id') 
       .eq('auth_id', authUser.id)
       .single();
 
@@ -30,20 +28,20 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const clientCartItems: CartItem[] = body.cartItems; 
-    const deliverySlotId: string | undefined = body.deliverySlotId; 
+    const deliverySlotId: string | undefined = body.deliverySlotId; // Retain if used, though not in DB schema for orders
 
     if (!clientCartItems || clientCartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 });
     }
+    // Delivery slot validation can remain if it's a business rule, even if not stored on 'orders' table
     if (!deliverySlotId) {
         return NextResponse.json({ error: 'Delivery slot not selected.' }, { status: 400 });
     }
 
-    // Fetch product prices and stock from DB to ensure accuracy and prevent manipulation
     const productIds = clientCartItems.map(item => item.id);
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select('id, price, stock, name') // Fetch name for error messages
+      .select('id, price, stock, name') 
       .in('id', productIds);
 
     if (productsError) {
@@ -77,7 +75,6 @@ export async function POST(req: NextRequest) {
         user_id: userId, 
         total_amount: totalAmount, 
         status: 'pending', // Initial status
-        // delivery_slot_id: deliverySlotId, // You might want to store this
       })
       .select()
       .single();
@@ -96,9 +93,7 @@ export async function POST(req: NextRequest) {
     const { error: orderItemsError } = await supabase.from('order_items').insert(itemsWithOrderId);
     if (orderItemsError) {
       console.error('Error inserting order items:', orderItemsError);
-      // Potentially roll back order creation or mark as failed
-      // For now, return an error. A transaction would be ideal here.
-      await supabase.from('orders').delete().eq('id', orderData.id); // Attempt to rollback
+      await supabase.from('orders').delete().eq('id', orderData.id); 
       return NextResponse.json({ error: `Failed to save order details: ${orderItemsError.message}. Order has been cancelled.` }, { status: 500 });
     }
 
@@ -106,20 +101,17 @@ export async function POST(req: NextRequest) {
     for (const item of orderItemsToInsert) {
       const { error: stockDecrementError } = await supabase.rpc('decrement_stock', {
         p_id: item.product_id,
-        qty_to_decrement: item.quantity, // Ensure argument name matches SQL function
+        qty_to_decrement: item.quantity, 
       });
       if (stockDecrementError) {
         console.error(`Error decrementing stock for ${item.product_id}:`, stockDecrementError);
-        // This is critical. Order is created but stock not updated.
-        // Implement robust rollback logic or at least log for manual intervention.
-        // For simplicity, we'll try to revert order and items.
         await supabase.from('order_items').delete().eq('order_id', orderData.id);
         await supabase.from('orders').delete().eq('id', orderData.id);
         return NextResponse.json({ error: `Stock update failed for a product. ${stockDecrementError.message}. Order cancelled.` }, { status: 500 });
       }
     }
 
-    return NextResponse.json({ success: true, order: orderData, message: "Order placed successfully!" });
+    return NextResponse.json({ success: true, order: orderData, message: "Order placed successfully! Awaiting payment confirmation." });
 
   } catch (e: unknown) {
     console.error('POST /api/checkout general error:', e);
@@ -129,22 +121,27 @@ export async function POST(req: NextRequest) {
 }
     
 // --- SQL for Supabase RPC function `decrement_stock` ---
-// You need to create this function in your Supabase SQL editor:
+// Ensure this function is created in your Supabase SQL editor.
+// Do NOT use this if you also use a database trigger on 'order_items' to decrement stock, as it will lead to double-decrementing.
 //
-// CREATE OR REPLACE FUNCTION decrement_stock(p_id uuid, qty_to_decrement int)
-// RETURNS void AS $$
+// CREATE OR REPLACE FUNCTION public.decrement_stock(p_id uuid, qty_to_decrement integer)
+// RETURNS void
+// LANGUAGE plpgsql
+// SECURITY DEFINER -- Important for permission to update products table
+// AS $$
 // BEGIN
-//   UPDATE products
+//   UPDATE public.products
 //   SET stock = stock - qty_to_decrement
 //   WHERE id = p_id AND stock >= qty_to_decrement;
-
+//
 //   IF NOT FOUND THEN
-//     RAISE EXCEPTION 'Insufficient stock for product ID % (tried to decrement by %, stock is less than %)', p_id, qty_to_decrement, qty_to_decrement;
+//     -- This means either product_id didn't exist or stock was insufficient
+//     RAISE EXCEPTION 'Insufficient stock for product ID % (tried to decrement by %, stock is less than requested or product not found)', p_id, qty_to_decrement;
 //   END IF;
 // END;
-// $$ LANGUAGE plpgsql SECURITY DEFINER;
+// $$;
 //
-// -- Optional: Grant execute permission if needed, though 'security definer' often covers this.
-// -- GRANT EXECUTE ON FUNCTION decrement_stock(uuid, int) TO authenticated;
+// -- Grant execute permission to the role your application uses (e.g., authenticated)
+// GRANT EXECUTE ON FUNCTION public.decrement_stock(uuid, integer) TO authenticated;
 // ---
     
