@@ -218,7 +218,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     else if (pathname.startsWith('/cosmetics')) newActiveSection = 'cosmetics';
     else if (pathname.startsWith('/fastfood')) newActiveSection = 'fastfood';
     
-    const isSearchRelevantPage = pathname === '/sections' || 
+    const isSearchRelevantPage = pathname === '/categories' || 
                                  pathname.startsWith('/grocery') ||
                                  pathname.startsWith('/cosmetics') ||
                                  pathname.startsWith('/fastfood') ||
@@ -242,13 +242,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     } else if (!pathname.startsWith('/category/')) { 
       // If not in a static section AND not in a dynamic category page, clear section context.
-      // This allows /sections, /account, etc., to have a neutral context.
+      // This allows /categories, /account, etc., to have a neutral context.
       if (currentSection !== null) { 
         setCurrentSection(null);
         setCurrentSectionConfig(null);
         // Potentially reset cart/wishlist here too if they are section-specific
         // For now, let's assume cart/wishlist are global unless on a static section page
-         if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin') || pathname.startsWith('/not-authorized') || pathname === '/sections') {
+         if (pathname === '/' || pathname.startsWith('/account') || pathname.startsWith('/settings') || pathname.startsWith('/auth') || pathname.startsWith('/admin') || pathname.startsWith('/not-authorized') || pathname === '/categories') {
            if (searchTerm) setSearchTerm('');
            if (searchFilterType !== 'all') setSearchFilterType('all');
            if (selectedCategory !== 'all') setSelectedCategory('all'); // Reset sub-category on global pages
@@ -261,13 +261,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [pathname, currentSection, searchTerm, searchFilterType, selectedCategory, setCurrentSection, setCurrentSectionConfig, setSelectedCategory]);
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<SupabaseUser | null> => {
+    console.log(`[AppContext] fetchUserProfile: Fetching profile for user ID: ${userId}`);
     const { data: profileData, error } = await supabase
       .from('users')
       .select('*')
       .eq('auth_id', userId)
       .single();
     if (error) {
-      console.error('Error fetching user profile:', error);
+      console.error('[AppContext] fetchUserProfile: Error fetching user profile:', error.message);
       if (error.code !== 'PGRST116') { 
         toast({ 
           title: "Profile Error", 
@@ -275,17 +276,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           variant: "destructive" 
         });
       } else {
-        console.warn(`User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
-        toast({
-            title: "Profile Setup Pending",
-            description: "Your profile is being finalized. If this message persists, please try signing in again shortly or contact support.",
-            variant: "default",
-            duration: 7000,
-        });
+        console.warn(`[AppContext] fetchUserProfile: User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
+        // Do not toast here as it might be too early or frequent for a new user
       }
       setUserProfile(null); 
       return null;
     } else {
+      console.log(`[AppContext] fetchUserProfile: Profile fetched successfully for user ID: ${userId}`, profileData);
       setUserProfile(profileData as SupabaseUser);
       return profileData as SupabaseUser;
     }
@@ -293,48 +290,56 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     setIsLoadingAuth(true);
+    console.log('[AppContext] useEffect[auth]: Initializing auth state listener. isLoadingAuth=true');
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Supabase Auth Event:', event, 'Session User:', session?.user?.email, 'Confirmed:', session?.user?.email_confirmed_at);
+      console.log('[AppContext] onAuthStateChange: Event:', event, 'Session User:', session?.user?.email);
       const currentAuthUser = session?.user ?? null;
       setAuthUser(currentAuthUser);
 
-      if (currentAuthUser) {
-        console.log(`Auth state change: User ${currentAuthUser.id} event ${event}`);
-        if (event === 'SIGNED_IN' && !currentAuthUser.email_confirmed_at) {
-          console.log('User signed in but email not yet confirmed.');
-        } else if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && currentAuthUser.email_confirmed_at && !userProfile?.email) {
-          console.log('User email confirmed or user updated post-confirmation, fetching profile.');
-          if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at && !session?.user?.user_metadata?.email_verified_toast_shown) {
-              toast({ title: "Email Verified!", description: "Your email has been successfully verified. You can now sign in." });
-          }
+      try {
+        if (currentAuthUser) {
+          await fetchUserProfile(currentAuthUser.id);
+        } else {
+          setUserProfile(null);
         }
-        await fetchUserProfile(currentAuthUser.id);
-      } else {
-        console.log('Auth state change: No user session.');
+      } catch (e) {
+        console.error("[AppContext] onAuthStateChange: Error during fetchUserProfile:", e);
         setUserProfile(null);
+      } finally {
+        setIsLoadingAuth(false);
+        console.log('[AppContext] onAuthStateChange: Done. isLoadingAuth=false. AuthUser:', currentAuthUser?.id, 'Final UserProfile:', userProfile?.id);
       }
-      setIsLoadingAuth(false);
     });
     
     const getInitialSession = async () => {
+      console.log('[AppContext] getInitialSession: Fetching initial session. isLoadingAuth=true (will be set by call)');
+      setIsLoadingAuth(true); // Explicitly set true before async operation
+      try {
         const { data: { session } } = await supabase.auth.getSession();
         const initialAuthUser = session?.user ?? null;
+        console.log('[AppContext] getInitialSession: Initial Session User:', initialAuthUser?.email);
         setAuthUser(initialAuthUser);
-        console.log('Initial Session User:', initialAuthUser?.email, 'Confirmed:', initialAuthUser?.email_confirmed_at);
 
         if (initialAuthUser) {
             await fetchUserProfile(initialAuthUser.id);
         } else {
             setUserProfile(null);
         }
+      } catch (e) {
+        console.error("[AppContext] getInitialSession: Error during fetchUserProfile:", e);
+        setUserProfile(null);
+      } finally {
         setIsLoadingAuth(false);
+        console.log('[AppContext] getInitialSession: Done. isLoadingAuth=false. AuthUser:', authUser?.id, 'Final UserProfile:', userProfile?.id);
+      }
     };
     getInitialSession();
 
     return () => {
       authListener?.subscription.unsubscribe();
+      console.log('[AppContext] useEffect[auth]: Auth state listener unsubscribed.');
     };
-  }, [fetchUserProfile, toast, userProfile?.email]);
+  }, [fetchUserProfile, toast]); // Removed userProfile?.email from dependencies as fetchUserProfile now logs more
 
   useEffect(() => {
     const fetchAppAnnouncement = async () => {
@@ -368,8 +373,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     toast({ title: "Signed In Successfully!"});
-    // fetchUserProfile will be called by onAuthStateChange
-    setIsLoadingAuth(false); 
+    // fetchUserProfile will be called by onAuthStateChange, which also sets isLoadingAuth=false
     return true; 
   };
 
@@ -396,7 +400,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     
     toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
-    setIsLoadingAuth(false); 
+    // isLoadingAuth will be set to false by onAuthStateChange after processing this new user state.
     return true; 
   };
   
@@ -410,9 +414,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setCart([]);
       setWishlist([]);
       setViewedProducts([]);
-      // UserProfile will be set to null by onAuthStateChange
+      // UserProfile and authUser will be set to null by onAuthStateChange
     }
-    setIsLoadingAuth(false); 
+    // isLoadingAuth will be set to false by onAuthStateChange
   };
 
 
