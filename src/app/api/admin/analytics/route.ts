@@ -29,16 +29,17 @@ interface ChartSignupData {
 }
 
 interface DashboardStats {
-  totalRevenue: number;
-  totalOrders: number;
-  activeUsers: number;
-  conversionRate: number;
+  totalRevenueLast30Days: number;
+  totalOrdersAllTime: number;
+  activeUsersLast30Days: number;
+  conversionRateLast30Days: number;
+  ordersLast30Days: number; // Added for more precise AOV calculation
 }
 
 interface AnalyticsApiResponse {
-  revenue: RevenueDataPoint[] | ChartRevenueData[]; // Allow both for processing
+  revenue: ChartRevenueData[];
   inventory: InventoryStatus[];
-  signups: SignupDataPoint[] | ChartSignupData[]; // Allow both for processing
+  signups: ChartSignupData[];
   stats: DashboardStats;
 }
 
@@ -48,8 +49,6 @@ export async function GET(req: NextRequest) {
 
   if (cookieStore.getAll().length > 0) {
     console.log('API /api/admin/analytics: Cookie store is NOT empty. Cookies are being received by the route handler.');
-    // You can log specific cookie names if needed for debugging, e.g.,
-    // cookieStore.getAll().forEach(cookie => console.log(`Cookie: ${cookie.name}`));
   } else {
     console.warn('API /api/admin/analytics: Cookie store IS EMPTY. This is the primary reason for auth issues if it happens consistently.');
   }
@@ -61,7 +60,6 @@ export async function GET(req: NextRequest) {
     const { data: { user: authApiUser }, error: authError } = await supabase.auth.getUser();
 
     if (authError) {
-      // This is where "Auth session missing!" would be caught if authError is populated.
       console.error('API /api/admin/analytics: Auth error from supabase.auth.getUser():', authError.message);
       return NextResponse.json({ error: `Auth service error: ${authError.message}` }, { status: 500 });
     }
@@ -95,7 +93,6 @@ export async function GET(req: NextRequest) {
     }
     console.log(`API /api/admin/analytics: User ${authApiUser.email} confirmed as admin. Proceeding to fetch analytics data.`);
 
-    // Helper to fetch data with fallback and logging
     const fetchDataWithFallback = async (queryPromise: Promise<{ data: any; error: any; count?: number | null }>, fallbackValue: any = [], metricName: string = "Unknown Metric") => {
       try {
         const { data, error, count } = await queryPromise;
@@ -112,13 +109,13 @@ export async function GET(req: NextRequest) {
     };
 
     const revenueResult = await fetchDataWithFallback(supabase.from('revenue_over_time').select('*'), [], 'Revenue Over Time');
-    const inventoryResult = await fetchDataWithFallback(supabase.from('inventory_status').select('*'), [], 'Inventory Status'); // Not used in current dashboard, but good to have
+    const inventoryResult = await fetchDataWithFallback(supabase.from('inventory_status').select('*'), [], 'Inventory Status');
     const signupsResult = await fetchDataWithFallback(supabase.from('new_signups_over_time').select('*'), [], 'New Signups Over Time');
     
-    const totalOrdersResult = await fetchDataWithFallback(
+    const totalOrdersAllResult = await fetchDataWithFallback(
       supabase.from('orders').select('id', { count: 'exact', head: true }), 
       { count: 0 }, 
-      'Total Orders Count'
+      'Total Orders Count (All Time)'
     );
     const activeUsersCountResult = await fetchDataWithFallback(
       supabase.from('active_users_count_last_30_days').select('count').single(),
@@ -131,41 +128,42 @@ export async function GET(req: NextRequest) {
       'Orders Count (Last 30 Days)'
     );
 
-    const revenueData = revenueResult.data || [];
+    const rawRevenueData = revenueResult.data || [];
     const inventoryData = inventoryResult.data || [];
-    const signupsData = signupsResult.data || [];
+    const rawSignupsData = signupsResult.data || [];
     
-    const totalOrders = totalOrdersResult.count || 0;
-    const activeUsersCount = activeUsersCountResult.data?.count || 0;
-    const ordersLast30DaysCount = ordersLast30DaysCountResult.data?.count || 0;
+    const totalOrdersAllTime = totalOrdersAllResult.count || 0;
+    const activeUsersLast30Days = activeUsersCountResult.data?.count || 0;
+    const ordersLast30Days = ordersLast30DaysCountResult.data?.count || 0;
 
-    let conversionRate = 0;
-    if (activeUsersCount > 0) {
-      conversionRate = (ordersLast30DaysCount / activeUsersCount) * 100;
+    let conversionRateLast30Days = 0;
+    if (activeUsersLast30Days > 0 && ordersLast30Days > 0) {
+      conversionRateLast30Days = (ordersLast30Days / activeUsersLast30Days) * 100;
     }
     
-    // Process data for charts (format date, etc.)
-    const processedRevenueData = (revenueData as RevenueDataPoint[]).map(item => ({
+    const processedRevenueData: ChartRevenueData[] = (rawRevenueData as RevenueDataPoint[]).map(item => ({
         name: format(new Date(item.day), 'MMM dd'),
-        revenue: item.revenue,
+        revenue: item.revenue || 0,
     })).slice(-30);
 
-    const processedSignupData = (signupsData as SignupDataPoint[]).map(item => ({
+    const processedSignupData: ChartSignupData[] = (rawSignupsData as SignupDataPoint[]).map(item => ({
         name: format(new Date(item.day), 'MMM dd'),
-        signups: item.signup_count,
+        signups: item.signup_count || 0,
     })).slice(-30);
 
+    const totalRevenueLast30Days = processedRevenueData.reduce((sum: number, item: ChartRevenueData) => sum + (item.revenue || 0), 0);
 
     console.log('API /api/admin/analytics: Successfully fetched and processed all analytics data (with fallbacks if needed).');
     return NextResponse.json({
-      revenue: processedRevenueData, // Send processed data
+      revenue: processedRevenueData,
       inventory: inventoryData,
-      signups: processedSignupData, // Send processed data
+      signups: processedSignupData,
       stats: {
-        totalRevenue: processedRevenueData.reduce((sum: number, item: any) => sum + (item.revenue || 0), 0) || 0,
-        totalOrders: totalOrders,
-        activeUsers: activeUsersCount,
-        conversionRate: parseFloat(conversionRate.toFixed(1)), 
+        totalRevenueLast30Days: totalRevenueLast30Days,
+        totalOrdersAllTime: totalOrdersAllTime,
+        activeUsersLast30Days: activeUsersLast30Days,
+        conversionRateLast30Days: parseFloat(conversionRateLast30Days.toFixed(1)), 
+        ordersLast30Days: ordersLast30Days, // Include this for AOV
       }
     } as AnalyticsApiResponse);
 
