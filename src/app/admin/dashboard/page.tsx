@@ -3,7 +3,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2, Info, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
+import { BarChart, LineChart, DollarSign, ShoppingCart, Users, Activity, Loader2, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -62,12 +62,10 @@ export default function AdminDashboardPage() {
     conversionRate: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null); // New state for fetch errors
   const { toast } = useToast();
 
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
-    setFetchError(null); // Reset error state on new fetch
     try {
       const response = await fetch('/api/admin/analytics');
       if (!response.ok) {
@@ -98,7 +96,6 @@ export default function AdminDashboardPage() {
     } catch (error) {
       console.error("Error fetching admin analytics:", error);
       const errorMessage = (error as Error).message;
-      setFetchError(errorMessage);
       toast({ title: "Analytics Error", description: errorMessage, variant: "destructive" });
       // Set to default empty/zero states on error
       setRevenueChartData([]);
@@ -133,27 +130,12 @@ export default function AdminDashboardPage() {
         </Button>
       </header>
 
-      {isLoading && (
+      {isLoading ? (
         <div className="flex justify-center items-center py-10 h-64">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-3 text-muted-foreground">Loading analytics data...</p>
         </div>
-      )}
-
-      {!isLoading && fetchError && (
-        <Alert variant="destructive" className="max-w-2xl mx-auto">
-          <AlertTriangle className="h-5 w-5" />
-          <AlertTitle>Error Loading Analytics</AlertTitle>
-          <AlertDescription>
-            {fetchError}
-            <Button onClick={fetchAnalytics} variant="link" className="p-0 h-auto ml-2 text-destructive hover:text-destructive/80">
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {!isLoading && !fetchError && (
+      ) : (
         <>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -273,3 +255,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
