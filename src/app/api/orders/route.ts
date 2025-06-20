@@ -1,11 +1,15 @@
 
 // src/app/api/orders/route.ts
-import { supabase } from '@/data/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { DisplayOrder } from '@/types'; // Assuming DisplayOrder includes OrderItem details
 
 export async function GET(req: NextRequest) {
+  const cookieStore = cookies();
+  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
   try {
     console.log('API /api/orders: Attempting to get user session.');
     const { data: { user: authApiUser }, error: authError } = await supabase.auth.getUser();
@@ -30,7 +34,7 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (profileError || !userProfile) {
-      console.error(`API /api/orders: Error fetching user profile ID for auth_id ${authApiUser.id}:`, profileError);
+      console.error(`API /api/orders: Error fetching user profile ID for auth_id ${authApiUser.id}:`, profileError?.message);
       return NextResponse.json({ error: 'Could not retrieve user profile to fetch orders.' }, { status: 500 });
     }
     const userId = userProfile.id;
@@ -39,7 +43,7 @@ export async function GET(req: NextRequest) {
     // Fetch orders and their items for the user
     const { data: rawOrderData, error: ordersError } = await supabase
       .from('orders')
-      .select(`
+      .select(\`
         id,
         created_at,
         status,
@@ -57,35 +61,40 @@ export async function GET(req: NextRequest) {
             )
           )
         )
-      `)
+      \`)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (ordersError) {
-      console.error(`API /api/orders: Error fetching orders for user ID ${userId}:`, ordersError);
+      console.error(\`API /api/orders: Error fetching orders for user ID \${userId}:\`, ordersError);
       return NextResponse.json({ error: 'Failed to fetch orders.' }, { status: 500 });
     }
-    console.log(`API /api/orders: Successfully fetched ${rawOrderData.length} orders for user ID ${userId}`);
+    
+    if (!rawOrderData) {
+      console.warn(\`API /api/orders: No order data returned for user ID \${userId}, though no explicit error. Sending empty array.\`);
+      return NextResponse.json([]);
+    }
+    console.log(\`API /api/orders: Successfully fetched \${rawOrderData.length} orders for user ID \${userId}\`);
 
     // Transform data to match the frontend's DisplayOrder structure
     const formattedOrders: DisplayOrder[] = rawOrderData.map(order => {
-      const items = order.order_items.map((item: any) => {
+      const items = (order.order_items || []).map((item: any) => { // Ensure order.order_items is treated as an array
         const primaryImage = item.products?.product_images?.find((img: any) => img.is_primary)?.image_url;
         const productName = item.products?.name || 'Unknown Product';
         return {
           id: item.products?.id || 'unknown-product-id',
           name: productName,
-          quantity: item.quantity,
-          price: parseFloat(item.price), // Ensure price is a number
-          image: primaryImage || `https://placehold.co/80x80.png?text=${productName.substring(0,1)}`,
+          quantity: item.quantity || 0,
+          price: parseFloat(item.price || '0'), // Ensure price is a number
+          image: primaryImage || \`https://placehold.co/80x80.png?text=\${productName.substring(0,1).toUpperCase() || 'P'}\`,
           'data-ai-hint': item.products?.data_ai_hint || productName.toLowerCase().split(' ')[0] || 'item',
         };
       });
 
       return {
         id: order.id,
-        date: new Date(order.created_at).toISOString(), // Or format as needed
-        status: order.status as DisplayOrder['status'], // Assuming DB status matches type
+        date: order.created_at ? new Date(order.created_at).toISOString() : new Date().toISOString(), // Or format as needed
+        status: (order.status || 'unknown') as DisplayOrder['status'], // Assuming DB status matches type
         totalAmount: parseFloat(order.total_amount || '0'), // Ensure totalAmount is a number
         items: items,
       };
@@ -99,4 +108,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-
