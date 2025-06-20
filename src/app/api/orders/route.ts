@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     // Fetch orders and their items for the user
     const { data: rawOrderData, error: ordersError } = await supabase
       .from('orders')
-      .select(\`
+      .select(`
         id,
         created_at,
         status,
@@ -61,20 +61,20 @@ export async function GET(req: NextRequest) {
             )
           )
         )
-      \`)
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (ordersError) {
-      console.error(\`API /api/orders: Error fetching orders for user ID \${userId}:\`, ordersError);
+      console.error(`API /api/orders: Error fetching orders for user ID ${userId}:`, ordersError);
       return NextResponse.json({ error: 'Failed to fetch orders.' }, { status: 500 });
     }
     
     if (!rawOrderData) {
-      console.warn(\`API /api/orders: No order data returned for user ID \${userId}, though no explicit error. Sending empty array.\`);
+      console.warn(`API /api/orders: No order data returned for user ID ${userId}, though no explicit error. Sending empty array.`);
       return NextResponse.json([]);
     }
-    console.log(\`API /api/orders: Successfully fetched \${rawOrderData.length} orders for user ID \${userId}\`);
+    console.log(`API /api/orders: Successfully fetched ${rawOrderData.length} orders for user ID ${userId}`);
 
     // Transform data to match the frontend's DisplayOrder structure
     const formattedOrders: DisplayOrder[] = rawOrderData.map(order => {
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
           name: productName,
           quantity: item.quantity || 0,
           price: parseFloat(item.price || '0'), // Ensure price is a number
-          image: primaryImage || \`https://placehold.co/80x80.png?text=\${productName.substring(0,1).toUpperCase() || 'P'}\`,
+          image: primaryImage || `https://placehold.co/80x80.png?text=${productName.substring(0,1).toUpperCase() || 'P'}`,
           'data-ai-hint': item.products?.data_ai_hint || productName.toLowerCase().split(' ')[0] || 'item',
         };
       });

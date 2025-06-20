@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     console.log("API /api/products: Attempting to refetch product with joined data for ID:", productData.id);
     const { data: finalProductData, error: finalFetchError } = await supabase
       .from('products')
-      .select(\`
+      .select(`
         id,
         name,
         description,
@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
         category_id ( id, name ),
         brand_id ( id, name ),
         product_images ( image_url, is_primary )
-      \`)
+      `)
       .eq('id', productData.id)
       .single();
 
@@ -219,19 +219,9 @@ export async function GET(req: NextRequest) {
   console.log("API /api/products: GET request received.");
   
   try {
-    // Admin check for fetching all products - assuming this is for admin panel
-    // If this needs to be public, remove isAdmin check or create separate public endpoint
-    // For now, keeping it admin-protected for this specific GET.
-    // if (!await isAdmin(supabase)) {
-    //   console.warn("API /api/products: Admin check failed for GET. Forbidden access.");
-    //   return NextResponse.json({ error: 'Forbidden: Admin access required to list all products via this endpoint.' }, { status: 403 });
-    // }
-    // console.log("API /api/products: Admin authenticated for GET.");
-
-
     const { data, error } = await supabase
       .from('products')
-      .select(\`
+      .select(`
         id,
         name,
         description,
@@ -242,14 +232,14 @@ export async function GET(req: NextRequest) {
         product_images ( image_url, is_primary ),
         created_at,
         updated_at
-      \`)
+      `)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('API /api/products: Error fetching products in Supabase:', error.message);
       return NextResponse.json({ error: 'Failed to fetch products: ' + error.message }, { status: 500 });
     }
-    console.log(\`API /api/products: Fetched \${data?.length || 0} products successfully.\`);
+    console.log(`API /api/products: Fetched ${data?.length || 0} products successfully.`);
     return NextResponse.json(data);
 
   } catch (e: unknown) {
