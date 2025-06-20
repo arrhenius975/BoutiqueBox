@@ -3,7 +3,9 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+// The NextRequest type is not used for the first parameter in App Router for 'request',
+// it should be the standard 'Request' type.
+// import type { NextRequest } from 'next/server'; // Keep for reference if other handlers use it
 
 async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse }> {
   const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
@@ -27,7 +29,7 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 }
 
 export async function PUT(
-  req: NextRequest,
+  request: Request, // Changed from NextRequest to Request
   { params }: { params: { orderId: string } }
 ) {
   const cookieStore = cookies();
@@ -47,7 +49,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 });
     }
 
-    const { status } = await req.json();
+    // Use request.json() to get the body from the standard Request object
+    const { status } = await request.json(); 
     const validStatuses = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'];
     if (!status || typeof status !== 'string' || !validStatuses.includes(status.toLowerCase())) {
       return NextResponse.json({ error: 'Invalid or missing status provided. Valid statuses are: pending, paid, processing, shipped, delivered, cancelled.' }, { status: 400 });
