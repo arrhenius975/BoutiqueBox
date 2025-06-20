@@ -8,8 +8,8 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { ThemeManager } from '@/components/ThemeManager';
 import { useAppContext } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
-import { Button } from '@/components/ui/button'; // Added Button
+import { Loader2, AlertTriangle } from 'lucide-react'; 
+import { Button } from '@/components/ui/button'; 
 
 export default function AdminLayout({
   children,
@@ -21,29 +21,38 @@ export default function AdminLayout({
   const { toast } = useToast();
 
   useEffect(() => {
+    // This effect should only run once the auth loading state is settled.
     if (isLoadingAuth) {
-      console.log("[AdminLayout] useEffect: isLoadingAuth is true. Waiting...");
+      console.log("[AdminLayout] useEffect: isLoadingAuth is true. Waiting for auth state to settle...");
       return; 
     }
     console.log("[AdminLayout] useEffect: isLoadingAuth is false. AuthUser:", authUser?.id, "UserProfile:", userProfile?.id, "Role:", userProfile?.role);
 
+    // If no authenticated user, redirect to sign-in.
     if (!authUser) {
-      console.log("[AdminLayout] useEffect: No authUser. Redirecting to signin.");
+      console.log("[AdminLayout] useEffect: No authUser after loading. Redirecting to signin.");
       toast({ title: "Authentication Required", description: "Please sign in to access the admin area.", variant: "destructive"});
       router.push('/signin?redirect=/admin/dashboard');
-    } else if (userProfile && userProfile.role !== 'admin') {
+    } 
+    // If authenticated user exists, but their profile (with role) is loaded and role is not admin.
+    else if (userProfile && userProfile.role !== 'admin') {
       console.log(`[AdminLayout] useEffect: User role is '${userProfile.role}'. Access denied. Redirecting.`);
       toast({ title: "Access Denied", description: "You do not have permission to view this page.", variant: "destructive"});
       router.push('/not-authorized');
-    } else if (authUser && !userProfile) {
-      // This case is handled by the render logic below (Profile Data Missing).
-      // It implies auth check is done, user is authed, but profile couldn't be loaded.
-      console.warn("[AdminLayout] useEffect: Auth user exists, but profile (with role) is not loaded. Render logic will display message.");
     }
+    // If authUser exists, but userProfile is still null (after isLoadingAuth is false),
+    // it means the profile fetch failed or the profile doesn't exist.
+    // The render logic below will handle displaying a message for this state. No redirect from here.
+    else if (authUser && !userProfile) {
+      console.warn("[AdminLayout] useEffect: Auth user exists, isLoadingAuth is false, but profile is not loaded. Render logic will display specific message.");
+    }
+    // If authUser exists and userProfile exists and role IS admin, no redirect is needed from here.
+    // The content will render.
+
   }, [authUser, userProfile, isLoadingAuth, router, toast]);
 
 
-  // Primary Loader: Covers initial auth loading AND profile loading if authUser is present.
+  // Primary Loader: Covers initial auth loading AND profile loading if authUser is present but profile isn't yet.
   if (isLoadingAuth || (authUser && !userProfile && !isLoadingAuth)) { 
     console.log("[AdminLayout] Render: Displaying primary loader. isLoadingAuth:", isLoadingAuth, "authUser:", !!authUser, "userProfile:", !!userProfile);
     return (
@@ -57,10 +66,10 @@ export default function AdminLayout({
     );
   }
   
-  // After primary loading, if authUser is still not present, redirection should be happening.
-  // This is a fallback display while router.push in useEffect takes effect.
+  // Case 1: Not authenticated (after loading is complete)
+  // The useEffect above should be handling the redirect, this is a fallback message.
   if (!authUser) {
-    console.log("[AdminLayout] Render: No authUser after load. Displaying redirecting message.");
+    console.log("[AdminLayout] Render: No authUser after load. Displaying 'Redirecting to sign in...' message.");
      return (
        <>
         <ThemeManager themeClass="" />
@@ -72,15 +81,15 @@ export default function AdminLayout({
      );
   }
 
-  // At this point, authUser exists, and isLoadingAuth is false.
-  // If userProfile is still null, it means profile fetch failed or no profile exists.
+  // Case 2: Authenticated, but profile data is missing (after loading is complete)
+  // This means authUser exists, isLoadingAuth is false, but userProfile is null.
   if (!userProfile) { 
-    console.log("[AdminLayout] Render: AuthUser exists, isLoadingAuth is false, but NO userProfile. Displaying 'Profile Data Missing'.");
+    console.log("[AdminLayout] Render: AuthUser exists, isLoadingAuth is false, but NO userProfile. Displaying 'Admin Profile Data Missing'.");
     return (
       <>
         <ThemeManager themeClass="" />
-        <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900 items-center justify-center"> {/* Centering content */}
-          <main className="flex-1 p-4 md:p-8 flex flex-col items-center justify-center max-w-lg mx-auto"> {/* Centered main content */}
+        <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900 items-center justify-center">
+          <main className="flex-1 p-4 md:p-8 flex flex-col items-center justify-center max-w-lg mx-auto">
             <div className="text-center p-6 border rounded-lg shadow-md bg-card">
               <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-destructive mb-2">Admin Profile Data Missing</h2>
@@ -99,9 +108,10 @@ export default function AdminLayout({
     );
   }
   
-  // Final check: userProfile exists, but role is not admin (should be caught by useEffect redirect, this is a fallback)
+  // Case 3: Authenticated, profile loaded, but user is not an admin.
+  // The useEffect above should handle the redirect, this is a fallback message.
   if (userProfile.role !== 'admin') {
-     console.log("[AdminLayout] Render: UserProfile exists, but role is not admin. Displaying redirecting message.");
+     console.log("[AdminLayout] Render: UserProfile exists, but role is not admin. Displaying 'Access denied. Redirecting...' message.");
      return (
        <>
         <ThemeManager themeClass="" />
@@ -113,17 +123,18 @@ export default function AdminLayout({
      );
   }
 
-  // User is authenticated, profile is loaded, and role is admin
+  // Case 4: Authenticated, profile loaded, and user IS an admin. Render the children.
   console.log("[AdminLayout] Render: AuthUser, UserProfile, and Admin role confirmed. Rendering admin content.");
   return (
     <>
       <ThemeManager themeClass="" /> 
       <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
         <AdminSidebar />
-        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64"> {/* Ensure ml-0 md:ml-64 for sidebar spacing */}
+        <main className="flex-1 p-6 md:p-8 ml-0 md:ml-64">
           {children}
         </main>
       </div>
     </>
   );
 }
+

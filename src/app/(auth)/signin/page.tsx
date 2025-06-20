@@ -23,44 +23,68 @@ export default function SignInPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const success = await signInWithEmail(email, password);
+    await signInWithEmail(email, password); // signInWithEmail now also sets isLoadingAuth
     setIsSubmitting(false);
-    // Redirection will be handled by useEffect based on authUser and userProfile updates
+    // Redirection is primarily handled by useEffect based on authUser and userProfile updates from AppContext.
   };
 
   useEffect(() => {
-    if (!isLoadingAuth && authUser) {
-      if (userProfile) {
-        const redirectParam = searchParams.get('redirect');
-        if (redirectParam) {
-          router.push(redirectParam);
-        } else if (userProfile.role === 'admin') {
-          router.push('/admin/dashboard');
-        } else {
-          router.push('/profile'); // Updated redirect to /profile
-        }
-      }
+    // This effect runs when authUser, userProfile, or isLoadingAuth changes.
+    // It handles redirecting the user AFTER the auth state is confirmed and profile is loaded.
+    if (isLoadingAuth) {
+      console.log("[SignInPage] useEffect: isLoadingAuth is true. Waiting...");
+      return; // Wait until auth state is settled
     }
+    console.log("[SignInPage] useEffect: isLoadingAuth is false. AuthUser:", authUser?.id, "UserProfile:", userProfile?.id, "Role:", userProfile?.role);
+
+    if (authUser && userProfile) { // User is authenticated AND profile is loaded
+      const redirectParam = searchParams.get('redirect');
+      if (redirectParam) {
+        console.log(`[SignInPage] useEffect: Redirecting to param: ${redirectParam}`);
+        router.push(redirectParam);
+      } else if (userProfile.role === 'admin') {
+        console.log("[SignInPage] useEffect: Redirecting admin to /admin/dashboard");
+        router.push('/admin/dashboard');
+      } else {
+        console.log("[SignInPage] useEffect: Redirecting user to /profile");
+        router.push('/profile');
+      }
+    } else if (authUser && !userProfile && !isLoadingAuth) {
+      // User is authenticated, but profile hasn't loaded yet (or failed).
+      // This state should ideally be brief. If it persists, AppContext's profile fetching has an issue.
+      // The loader below handles this visually. No redirect from here.
+      console.log("[SignInPage] useEffect: AuthUser exists, but UserProfile is not yet available. Waiting for profile.");
+    }
+    // If !authUser and !isLoadingAuth, user stays on sign-in page.
+    
   }, [authUser, userProfile, isLoadingAuth, router, searchParams]);
 
 
-  if (isLoadingAuth && !authUser && !userProfile) {
+  // Show loader if AppContext is still verifying auth OR if user is authenticated but profile is still loading.
+  if (isLoadingAuth || (authUser && !userProfile && !isLoadingAuth)) {
+    console.log("[SignInPage] Render: Displaying loader. isLoadingAuth:", isLoadingAuth, "authUser:", !!authUser, "!userProfile:", !userProfile);
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2 text-muted-foreground">Checking session...</p>
       </div>
     );
   }
 
-  if (authUser && !isLoadingAuth) {
+  // If user is authenticated AND profile is loaded, but useEffect for redirection hasn't run yet
+  // (or is in progress), show a redirecting message.
+  if (authUser && userProfile && !isLoadingAuth) {
+     console.log("[SignInPage] Render: AuthUser and UserProfile are loaded. Should be redirecting via useEffect.");
      return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="ml-2">{userProfile ? 'Redirecting...' : 'Loading profile & redirecting...'}</p>
+        <p className="ml-2 text-muted-foreground">Redirecting...</p>
       </div>
     );
   }
 
+  // If not loading and not authenticated, show the sign-in form.
+  console.log("[SignInPage] Render: Displaying Sign In form.");
   return (
     <Card className="w-full max-w-md shadow-xl">
       <CardHeader className="text-center">
@@ -79,7 +103,7 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              disabled={isSubmitting || isLoadingAuth}
+              disabled={isSubmitting} // Only disable during direct form submission attempt
             />
           </div>
           <div className="space-y-1.5">
@@ -91,13 +115,13 @@ export default function SignInPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              disabled={isSubmitting || isLoadingAuth}
+              disabled={isSubmitting}
             />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
-          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting || isLoadingAuth}>
-            {(isSubmitting || isLoadingAuth) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
+          <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
             Sign In
           </Button>
           <p className="text-sm text-muted-foreground">
@@ -117,3 +141,4 @@ export default function SignInPage() {
     </Card>
   );
 }
+

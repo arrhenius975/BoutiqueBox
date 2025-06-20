@@ -262,37 +262,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserProfile = useCallback(async (userId: string): Promise<SupabaseUser | null> => {
     console.log(`[AppContext] fetchUserProfile: Fetching profile for user ID: ${userId}`);
-    const { data: profileData, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('auth_id', userId)
-      .single();
-    if (error) {
-      console.error('[AppContext] fetchUserProfile: Error fetching user profile:', error.message);
-      if (error.code !== 'PGRST116') { 
-        toast({ 
-          title: "Profile Error", 
-          description: `Could not load your profile details. ${error.message}`, 
-          variant: "destructive" 
-        });
+    let profileToSet: SupabaseUser | null = null;
+    try {
+      const { data: profileData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', userId)
+        .single();
+      if (error) {
+        console.error('[AppContext] fetchUserProfile: Error fetching user profile:', error.message);
+        if (error.code !== 'PGRST116') { 
+          toast({ 
+            title: "Profile Error", 
+            description: `Could not load your profile details. ${error.message}`, 
+            variant: "destructive" 
+          });
+        } else {
+          console.warn(`[AppContext] fetchUserProfile: User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
+        }
       } else {
-        console.warn(`[AppContext] fetchUserProfile: User profile not found for auth_id ${userId}. This is normal for a new user if the database trigger (handle_new_user) hasn't created the public.users entry yet, or if the trigger is missing. Ensure the trigger is set up in Supabase.`);
-        // Do not toast here as it might be too early or frequent for a new user
+        console.log(`[AppContext] fetchUserProfile: Profile fetched successfully for user ID: ${userId}`, profileData);
+        profileToSet = profileData as SupabaseUser;
       }
-      setUserProfile(null); 
-      return null;
-    } else {
-      console.log(`[AppContext] fetchUserProfile: Profile fetched successfully for user ID: ${userId}`, profileData);
-      setUserProfile(profileData as SupabaseUser);
-      return profileData as SupabaseUser;
+    } catch(e) {
+        console.error('[AppContext] fetchUserProfile: Exception during fetch:', e);
+    } finally {
+        setUserProfile(profileToSet); // Set profile (or null if error/not found)
+        return profileToSet; // Return what was set
     }
   }, [toast, setUserProfile]); 
 
   useEffect(() => {
     setIsLoadingAuth(true);
     console.log('[AppContext] useEffect[auth]: Initializing auth state listener. isLoadingAuth=true');
+    
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AppContext] onAuthStateChange: Event:', event, 'Session User:', session?.user?.email);
+      setIsLoadingAuth(true); // Set loading true at the start of handling state change
       const currentAuthUser = session?.user ?? null;
       setAuthUser(currentAuthUser);
 
@@ -307,13 +313,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setUserProfile(null);
       } finally {
         setIsLoadingAuth(false);
-        console.log('[AppContext] onAuthStateChange: Done. isLoadingAuth=false. AuthUser:', currentAuthUser?.id, 'Final UserProfile:', userProfile?.id);
+        console.log(`[AppContext] onAuthStateChange: Done. isLoadingAuth=false. AuthUser: ${currentAuthUser?.id}, UserProfile: ${userProfile?.id} (Note: userProfile here might be stale due to closure, check context value)`);
       }
     });
     
     const getInitialSession = async () => {
-      console.log('[AppContext] getInitialSession: Fetching initial session. isLoadingAuth=true (will be set by call)');
-      setIsLoadingAuth(true); // Explicitly set true before async operation
+      console.log('[AppContext] getInitialSession: Fetching initial session.');
+      setIsLoadingAuth(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const initialAuthUser = session?.user ?? null;
@@ -326,11 +332,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             setUserProfile(null);
         }
       } catch (e) {
-        console.error("[AppContext] getInitialSession: Error during fetchUserProfile:", e);
-        setUserProfile(null);
+        console.error("[AppContext] getInitialSession: Error during initial session/profile fetch:", e);
+        setUserProfile(null); // Ensure profile is null on error
       } finally {
         setIsLoadingAuth(false);
-        console.log('[AppContext] getInitialSession: Done. isLoadingAuth=false. AuthUser:', authUser?.id, 'Final UserProfile:', userProfile?.id);
+        console.log(`[AppContext] getInitialSession: Done. isLoadingAuth=false. AuthUser: ${authUser?.id}, UserProfile: ${userProfile?.id} (Note: these values might be stale due to closure, check context value)`);
       }
     };
     getInitialSession();
@@ -339,7 +345,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       authListener?.subscription.unsubscribe();
       console.log('[AppContext] useEffect[auth]: Auth state listener unsubscribed.');
     };
-  }, [fetchUserProfile, toast]); // Removed userProfile?.email from dependencies as fetchUserProfile now logs more
+  }, [fetchUserProfile]);
+
 
   useEffect(() => {
     const fetchAppAnnouncement = async () => {
@@ -364,21 +371,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signInWithEmail = async (email: string, password: string): Promise<boolean> => {
-    setIsLoadingAuth(true);
+    setIsLoadingAuth(true); // Indicate loading start
     const { error, data } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
       toast({ title: "Sign In Failed", description: error.message, variant: "destructive" });
-      setIsLoadingAuth(false);
+      setIsLoadingAuth(false); // Reset loading on failure
       return false;
     }
+    // Success: onAuthStateChange will handle setting authUser, userProfile, and then isLoadingAuth to false.
     toast({ title: "Signed In Successfully!"});
-    // fetchUserProfile will be called by onAuthStateChange, which also sets isLoadingAuth=false
     return true; 
   };
 
   const signUpWithEmail = async (name: string, email: string, password: string): Promise<boolean> => {
-    setIsLoadingAuth(true);
+    setIsLoadingAuth(true); // Indicate loading start
     const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -389,34 +396,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     
     if (error) {
       toast({ title: "Sign Up Failed", description: error.message, variant: "destructive" });
-      setIsLoadingAuth(false);
+      setIsLoadingAuth(false); // Reset loading on failure
       return false;
     }
     
     if (data.user) {
-        console.log(`Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}. Awaiting email confirmation and trigger (handle_new_user) for public.users profile creation.`);
+        console.log(`[AppContext] signUpWithEmail: Supabase auth.signUp successful. Auth User ID: ${data.user.id}, Email: ${data.user.email}.`);
     } else {
-        console.warn("Supabase auth.signUp successful, but no user data returned in the response. This might indicate email confirmation is pending or an issue with Supabase project settings (e.g., auto-confirm off).");
+        console.warn("[AppContext] signUpWithEmail: Supabase auth.signUp successful, but no user data returned in the response.");
     }
     
     toast({ title: "Sign Up Successful!", description: "Please check your email to verify your account." });
-    // isLoadingAuth will be set to false by onAuthStateChange after processing this new user state.
+    // Success: onAuthStateChange will handle setting authUser (if auto-confirmed or after confirmation)
+    // and then isLoadingAuth to false.
     return true; 
   };
   
   const signOut = async () => {
-    setIsLoadingAuth(true);
+    setIsLoadingAuth(true); // Indicate loading start
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast({ title: "Sign Out Failed", description: error.message, variant: "destructive" });
+      setIsLoadingAuth(false); // Reset loading on failure
     } else {
       toast({ title: "Signed Out"});
       setCart([]);
       setWishlist([]);
       setViewedProducts([]);
-      // UserProfile and authUser will be set to null by onAuthStateChange
+      // UserProfile and authUser will be set to null by onAuthStateChange, 
+      // which will also set isLoadingAuth to false.
     }
-    // isLoadingAuth will be set to false by onAuthStateChange
   };
 
 
