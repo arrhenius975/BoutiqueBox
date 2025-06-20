@@ -1,9 +1,9 @@
-
 // src/app/api/categories/[id]/route.ts
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+// Using Request from Web API standard
+// import type { NextRequest } from 'next/server'; // Not needed if using standard Request
 
 // Helper to check admin role
 async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<boolean> {
@@ -20,7 +20,7 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 }
 
 export async function PUT(
-  req: NextRequest,
+  request: Request, // Changed from NextRequest to Request
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies();
@@ -38,7 +38,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid category ID.' }, { status: 400 });
     }
 
-    const { name, description } = await req.json();
+    const { name, description } = await request.json(); // Use request.json()
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
       return NextResponse.json({ error: 'Category name is required.' }, { status: 400 });
@@ -84,7 +84,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: NextRequest,
+  request: Request, // Changed from NextRequest to Request, although not used here
   { params }: { params: { id: string } }
 ) {
   const cookieStore = cookies();

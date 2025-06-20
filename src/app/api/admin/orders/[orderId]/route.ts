@@ -2,6 +2,12 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server'; // Keep NextRequest if req.json() is preferred or for other Next specific features
+
+// Define an interface for the params
+interface OrderRouteParams {
+  orderId: string;
+}
 
 // Helper to check admin role
 async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClient>): Promise<{ isAdmin: boolean; errorResponse?: NextResponse; userId?: string; userEmail?: string; }> {
@@ -20,9 +26,9 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 
   console.log(`isAdminCheck (orderId API): Fetching profile for auth_id ${user.id}`);
   const { data: profile, error: profileError } = await supabaseClient
-    .from('users') // Ensure this is 'users', not 'profiles'
+    .from('users')
     .select('role')
-    .eq('auth_id', user.id) // Match against the auth_id in your users table
+    .eq('auth_id', user.id)
     .single();
 
   if (profileError) {
@@ -45,26 +51,26 @@ async function isAdmin(supabaseClient: ReturnType<typeof createRouteHandlerClien
 }
 
 export async function PUT(
-  request: Request, // Use standard Web API Request type
-  { params }: { params: { orderId: string } } // Correct signature for App Router dynamic routes
+  request: Request, // Using standard Request
+  context: { params: OrderRouteParams } // Use the defined interface here
 ) {
   const cookieStore = cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   const adminCheck = await isAdmin(supabase);
-  if (!adminCheck.isAdmin || !adminCheck.errorResponse === undefined ) { // Ensure no errorResponse from isAdmin
-    return adminCheck.errorResponse || NextResponse.json({ error: 'Forbidden: Admin access required.' }, { status: 403 });
+  if (!adminCheck.isAdmin ) { 
+    return adminCheck.errorResponse || NextResponse.json({ error: 'Forbidden: Admin access required by default due to failed admin check.' }, { status: 403 });
   }
   console.log(`API /api/admin/orders/[orderId]: Admin user ${adminCheck.userEmail} (ID: ${adminCheck.userId}) authorized for PUT.`);
 
   try {
-    const { orderId } = params;
+    const { orderId } = context.params; // Destructure from context.params
     if (!orderId) {
       console.warn('API /api/admin/orders/[orderId]: Order ID missing in params.');
       return NextResponse.json({ error: 'Order ID is required.' }, { status: 400 });
     }
 
-    const body = await request.json(); // Get body from the standard Request object
+    const body = await request.json(); 
     const { status } = body;
     
     console.log(`API /api/admin/orders/[orderId]: Attempting to update order ${orderId} to status ${status}.`);
@@ -84,14 +90,13 @@ export async function PUT(
 
     if (error) {
       console.error(`API /api/admin/orders/[orderId]: Error updating order ${orderId} status:`, error);
-      if (error.code === 'PGRST116') { // Resource not found
+      if (error.code === 'PGRST116') { 
         return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
       }
       return NextResponse.json({ error: error.message || 'Failed to update order status.' }, { status: 500 });
     }
 
     if (!data) {
-      // This case should ideally be caught by PGRST116, but good to have a fallback.
       console.warn(`API /api/admin/orders/[orderId]: Order ${orderId} not found after update attempt, though no Supabase error.`);
       return NextResponse.json({ error: 'Order not found or update failed after query.' }, { status: 404 });
     }
