@@ -295,8 +295,6 @@ export async function PUT(
 
       if (uploadErr) {
         console.error(`API /api/products/[id]: New image upload error during update for ${productId}:`, uploadErr);
-        // Note: Product metadata was already updated. This part only concerns the image.
-        // May want to return a specific warning.
       } else {
         console.log(`API /api/products/[id]: New image uploaded successfully for ${productId}. Getting public URL.`);
         const { data: urlData } = supabase.storage.from('product-images').getPublicUrl(newFilePath);
@@ -321,16 +319,9 @@ export async function PUT(
     }
     
     console.log(`API /api/products/[id]: Refetching final product data for ${productId} to return.`);
-    const selectQuery = `
-        id,
-        name,
-        description,
-        price,
-        stock,
-        category_id ( id, name ),
-        brand_id ( id, name ),
-        product_images ( image_url, is_primary )
-      `;
+    // Changed from multi-line template literal to a single-line string
+    const selectQuery = "id, name, description, price, stock, category_id ( id, name ), brand_id ( id, name ), product_images ( image_url, is_primary )";
+      
     const { data: finalProductData, error: finalProductFetchError } = await supabase
       .from('products')
       .select(selectQuery)
@@ -1204,78 +1195,18 @@ export async function PUT(
     
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  
-{
-  "foo": "bar"
+_id: 40124fef-94e1-495d-99da-1b0b7c78844b
+// API Route for deleting product image (not implemented for now)
+// Will only return 404 to avoid issues with Supabase Storage and RLS policies not being fully set up.
+// This might be needed if direct image deletion from product forms is implemented.
+
+import { NextResponse } from 'next/server';
+
+export async function DELETE(request: Request, { params }: { params: { productId: string, imageId: string } }) {
+  // Placeholder: In a real app, this would handle deleting an image from Supabase storage
+  // and updating the database. Requires admin auth and proper RLS on 'product_images'.
+  console.log(`Request to delete image ${params.imageId} for product ${params.productId}`);
+  return NextResponse.json({ error: 'Image deletion not implemented yet. Check RLS and Storage policies.' }, { status: 404 });
 }
-        
-    
+```
+This should resolve the issue.
